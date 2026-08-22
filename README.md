@@ -54,16 +54,6 @@ opencode-termux models        # katalog model (tes jaringan/DNS)
 
 Model gratis default: **`opencode/x-preview-f-free`** (Ox Alpha Free · Unlimited).
 
-## ⛏️ Contoh: Mining POW (Sepolia faucet)
-
-```bash
-PK910_CAPTCHA_TOKEN=<token> opencode-termux
-# → menu 17. Mining POW
-```
-
-Token didapat dari [sepolia-faucet.pk910.de](https://sepolia-faucet.pk910.de):
-solve captcha → DevTools (F12) → Network → request `startSession` → field `captchaToken`.
-
 ## 🔧 Troubleshooting
 
 | Masalah | Solusi |
