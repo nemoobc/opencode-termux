@@ -63,6 +63,33 @@ Model gratis default: **`opencode/x-preview-f-free`** (Ox Alpha Free · Unlimite
 | Perintah jaringan gantung | pastikan `$PREFIX/etc/resolv.conf` ada — installer/shim membuatnya otomatis |
 | Versi upstream lama | `npm i -g @nemoobc/opencode-termux@latest` — installer selalu tarik rilis terbaru |
 
+## ⚠️ Pesan error yang datang dari provider (BUKAN bug paket ini)
+
+Paket ini hanya menjalankan binary resmi opencode. Error model/network berasal
+dari server provider — beberapa di antaranya tampil dalam bahasa Mandarin
+karena backend relay model gratisnya memang begitu.
+
+**1. `Upstream request failed: 图片输入格式/解析错误 [retrying...]`**
+
+Artinya: *"format/parsing input gambar salah"*. Muncul ketika ada **gambar**
+masuk ke konteks percakapan (file gambar/GIF yang dibaca, paste screenshot,
+dsb.) dan endpoint model gagal memprosesnya.
+
+Cara mengatasinya:
+- Mulai sesi baru dengan `/new`, lalu hindari membaca/melampirkan gambar.
+- Atau ganti ke model lain lewat `/models`.
+
+**2. `service unavailable`**
+
+Server model sedang overload/down sesaat. opencode sudah retry otomatis
+(`attempt #n`) — biasanya pulih sendiri beberapa detik kemudian. Kalau sering:
+ganti model dulu via `/models`, coba lagi nanti.
+
+**3. Saat keluar muncul `opencode -s <id>`**
+
+Itu **bukan error** — petunjuk resmi untuk melanjutkan sesi terakhir.
+Jalankan persis perintah itu jika ingin lanjut, atau abaikan saja.
+
 ## ⚙️ Variabel lingkungan
 
 | Var | Fungsi |
