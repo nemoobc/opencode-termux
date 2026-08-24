@@ -2,11 +2,15 @@ name: bersihkan actions gagal
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "23 2 * * *"   # harian — pembersihan rutin ditangani monitor lokal
   workflow_dispatch:
 
 permissions:
   actions: write
+
+concurrency:
+  group: bersihkan
+  cancel-in-progress: true
 
 jobs:
   clean:
