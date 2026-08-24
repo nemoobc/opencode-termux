@@ -35,7 +35,7 @@ t("package.json: JSON valid & field wajib", () => {
   const p = json("package.json")
   ok(p.name === "@nemoobc/opencode-termux", "nama paket salah")
   ok(/^\d+\.\d+\.\d+$/.test(p.version), `versi tidak semver: ${p.version}`)
-  ok(p.bin && p.bin["opencode-termux"] === "./bin/opencode.js", "bin salah")
+  ok(p.bin && p.bin["opencode-termux"] === "./bin/opencode-termux.js", "bin salah")
   ok(typeof p.opencodeUpstream === "string" && /^\d+\.\d+\.\d+$/.test(p.opencodeUpstream), "opencodeUpstream tidak semver")
   ok(p.scripts && typeof p.scripts.test === "string", "script test hilang")
 })
@@ -55,7 +55,7 @@ t("package.json: pin upstream == upstream opencode-ai terbaru", () => {
 })
 
 // ===== 2. sintaks =====
-for (const f of ["bin/opencode.js", "install.mjs",
+for (const f of ["bin/opencode-termux.js", "install.mjs",
   ...fs.readdirSync(path.join(root, "lib")).map(x => `lib/${x}`)]) {
   t(`sintaks: ${f}`, () => execFileSync(process.execPath, ["--check", path.join(root, f)], { stdio: "pipe" }))
 }
@@ -208,6 +208,14 @@ t("gitignore: mencakup vendor/, .build/, node_modules/, *.tgz", () => {
   for (const need of ["vendor/", ".build/", "node_modules/", "*.tgz"]) ok(g.includes(need), `.gitignore kurang ${need}`)
 })
 
+// ===== 8b. identitas: semua rata jadi opencode-termux =====
+t("identitas: entrypoint bernama opencode-termux.js (bukan opencode.js)", () => {
+  ok(fs.existsSync(path.join(root, "bin/opencode-termux.js")), "bin/opencode-termux.js hilang")
+  ok(!fs.existsSync(path.join(root, "bin/opencode.js")), "sisa bin/opencode.js masih ada")
+  const lock = read("package-lock.json")
+  ok(lock.includes('"opencode-termux": "bin/opencode-termux.js"'), "package-lock belum ikut")
+})
+
 // ===== 9. E2E opsional (--e2e atau OCX_E2E=1) =====
 if (E2E) {
   console.log("\n🔧 mode E2E: instalasi bundle x64 + smoke test + subcommand…")
@@ -219,14 +227,14 @@ if (E2E) {
     })
   })
   t("e2e: vendor/opencode --version merespons", () => {
-    const out = execFileSync(process.execPath, [path.join(root, "bin/opencode.js"), "--version"], {
+    const out = execFileSync(process.execPath, [path.join(root, "bin/opencode-termux.js"), "--version"], {
       encoding: "utf8", env: process.env, cwd: root,
     })
     ok(/\d+\.\d+\.\d+/.test(out), `output tak dikenal: ${out.trim()}`)
     console.log(`   └─ version: ${out.trim()}`)
   })
   t("e2e: subcommand version mencetak versi paket & binary", () => {
-    const out = execFileSync(process.execPath, [path.join(root, "bin/opencode.js"), "version"], {
+    const out = execFileSync(process.execPath, [path.join(root, "bin/opencode-termux.js"), "version"], {
       encoding: "utf8", env: process.env, cwd: root,
     })
     ok(out.includes(`v${json("package.json").version}`), "versi paket tidak tercetak")
@@ -234,7 +242,7 @@ if (E2E) {
     console.log(`   └─ ${out.trim()}`)
   })
   t("e2e: subcommand doctor sehat (exit 0)", () => {
-    const r = spawnSync(process.execPath, [path.join(root, "bin/opencode.js"), "doctor"], {
+    const r = spawnSync(process.execPath, [path.join(root, "bin/opencode-termux.js"), "doctor"], {
       encoding: "utf8", env: { ...process.env, TERMUX_PREFIX: path.join(root, ".build-test-prefix") },
       cwd: root,
     })

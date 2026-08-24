@@ -84,11 +84,8 @@ opencode-termux --version
 | `opencode-termux doctor` | Diagnosis lingkungan & bundle (exit code jujur) |
 | `opencode-termux version` | Info versi paket + binary |
 
-Alias biar terasa asli:
-
-```bash
-ln -sf $PREFIX/bin/opencode-termux $PREFIX/bin/opencode
-```
+> Identitas perintah konsisten satu nama: **`opencode-termux`** — tanpa alias,
+> tanpa nama lain, di semua dokumentasi, log, dan script internal.
 
 ## 🧪 Tes
 
