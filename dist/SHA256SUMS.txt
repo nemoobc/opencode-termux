@@ -1,5 +1,0 @@
-cc853d8d0ab047c7bee00f13d531289007ff3d2557387f0b30db1ec924896e19  nemoobc-opencode-termux-1.20.1.tgz
-3d9f4b1b34ae975de381145bddbc58345f2a604c846cfcfd6ff2c43680e5daff  opencode-agents-and-config.zip
-b41049780a545521e9bfd98ff8ca3d0fe6126bc75e15be4c50adb1530e563b86  opencode-termux-1.20.1-aarch64.tar.gz
-56aa8e78886ef2d1547b0ed82a1db91ac698a882152afd5e030369ac69d91494  opencode-termux-1.20.1-x86_64.tar.gz
-3278eabface9f064d9c708ee831c49a29e7792d8511907cd01bf5f37e39f5531  opencode-termux-installer.sh

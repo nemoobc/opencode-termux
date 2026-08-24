@@ -226,14 +226,15 @@ t("expectedFromRegistry: ambil integrity dari packument", () => {
 t("git: tidak ada tarball/artefak build yang ter-track", () => {
   const ls = execFileSync("git", ["ls-files"], { cwd: root }).toString().split("\n").filter(Boolean)
   for (const f of ls) {
-    ok(!f.endsWith(".tgz"), `tarball masih di-track: ${f}`)
+    ok(!/\.(tgz|tar\.gz|zip|deb|rpm|apk)$/.test(f), `artefak binary masih di-track: ${f}`)
+    ok(!f.startsWith("dist/"), `dist/ masih di-track: ${f}`)
     ok(!f.startsWith("vendor/"), `vendor masih di-track: ${f}`)
     ok(f !== ".build" && !f.startsWith(".build/"), ".build masih di-track")
   }
 })
-t("gitignore: mencakup vendor/, .build/, node_modules/, *.tgz", () => {
+t("gitignore: mencakup vendor/, .build/, node_modules/, *.tgz, dist/", () => {
   const g = read(".gitignore")
-  for (const need of ["vendor/", ".build/", "node_modules/", "*.tgz"]) ok(g.includes(need), `.gitignore kurang ${need}`)
+  for (const need of ["vendor/", ".build/", "node_modules/", "*.tgz", "dist/"]) ok(g.includes(need), `.gitignore kurang ${need}`)
 })
 
 // ===== 8b. identitas: semua rata jadi opencode-termux =====
