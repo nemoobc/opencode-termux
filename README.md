@@ -66,6 +66,10 @@ npm i -g @nemoobc/opencode-termux
 > 📖 **Panduan lengkap** — persyaratan, verifikasi, update/uninstall,
 > troubleshooting, FAQ: [docs/INSTALASI.md](docs/INSTALASI.md)
 
+> 📦 **Tanpa Node / offline?** Ambil `opencode-termux-installer.sh` +
+> bundle `.tar.gz` dari [Releases](https://github.com/nemo-base-eth/opencode-termux/releases) —
+> installer murni POSIX sh, auto-detect arm64/x64, sha256 diverifikasi.
+
 > Jika muncul warning `install-scripts`, izinkan sekali:
 > ```bash
 > npm config set allow-scripts=@nemoobc/opencode-termux --location=user

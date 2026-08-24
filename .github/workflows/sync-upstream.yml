@@ -39,9 +39,13 @@ jobs:
           PYEOF
           git config user.name "nemoobc"
           git config user.email "258114617+nemoobc@users.noreply.github.com"
+          NEWVER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
           git add package.json
           git commit -m "sync: upstream opencode-ai $UP"
+          git tag "v$NEWVER"
           git push
+          git push origin "v$NEWVER"
+          echo "tag v$NEWVER didorong -> workflow release otomatis membangun 6 artefak"
           echo "synced=true" >> "$GITHUB_OUTPUT"
 
       - name: publish npm (kalau NPM_TOKEN dipasang)
