@@ -10,22 +10,15 @@
 
 ---
 
-## 🚀 Install
+## 🤖 Agent & tools otomatis
 
-```bash
-pkg update && pkg install nodejs-lts
-npm i -g @nemoobc/opencode-termux
-```
-
-Selesai. Tidak ada setting ulang — agent, command, dan config **otomatis terpasang**.
-
-## 🤖 Yang otomatis terpasang
+Sekali install — agent, command, dan config **langsung terpasang** tanpa setting ulang:
 
 | Agent | Tugas |
 |---|---|
 | **autodev** | Developer otonom universal: coding, tools, build, tes, fix, rilis — berurutan |
 | **termux-coder** | Coding assistant yang paham Termux (PATH, pkg, tanpa root) |
-| **apk-builder** | Build APK Android: payload, align, sign — resep lengkap |
+| **apk-builder** | Build APK Android: payload, align, sign |
 | **tester** | Jalankan seluruh test suite + laporan pass/fail |
 | **fixer** | Loop perbaikan: uji → analisis → fix minimal → uji ulang (maks 5x) |
 
@@ -40,13 +33,33 @@ Config default ikut terpasang: **model gratis `opencode/x-preview-f-free`** — 
 
 ## 🔄 Sync upstream otomatis
 
-Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) baru
-setiap 6 jam — begitu ada versi baru, paket ini otomatis menyesuaikan.
+Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) baru setiap
+6 jam — begitu ada versi baru, paket ini otomatis menyesuaikan (commit memakai identitas nemoobc).
 
-## ✅ Verifikasi
+---
+
+## Kenapa paket ini ada?
+
+Installer resmi `opencode-ai` gagal di Termux karena tidak mengenali
+`process.platform === "android"` dan tidak menyediakan build untuk Bionic libc.
+
+Paket ini menjembatani tanpa trik aneh:
+
+```
+opencode-termux (shim Node)
+   └─ vendor/ld-musl.so          ← musl libc hasil build khusus Termux*
+        └─ vendor/opencode       ← binary resmi opencode-linux-arm64-musl
+             ⤳ LD_LIBRARY_PATH → libstdc++ / libgcc_s (dari Alpine)
+```
+
+\* path `/etc/resolv.conf` & `/etc/hosts` dipatch saat kompilasi menuju
+`$PREFIX/etc/` sehingga DNS jalan tanpa root.
+
+## 🚀 Install
 
 ```bash
-opencode-termux --version
+pkg update && pkg install nodejs-lts
+npm i -g @nemoobc/opencode-termux
 ```
 
 > Jika muncul warning `install-scripts`, izinkan sekali:
@@ -54,6 +67,12 @@ opencode-termux --version
 > npm config set allow-scripts=@nemoobc/opencode-termux --location=user
 > npm rebuild -g @nemoobc/opencode-termux
 > ```
+
+## ✅ Verifikasi
+
+```bash
+opencode-termux --version
+```
 
 Alias biar terasa asli:
 
