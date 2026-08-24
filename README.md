@@ -4,6 +4,7 @@
 
 [![npm](https://img.shields.io/npm/v/@nemoobc/opencode-termux?color=cb3837&logo=npm)](https://www.npmjs.com/package/@nemoobc/opencode-termux)
 [![release](https://img.shields.io/github/v/release/nemoobc/opencode-termux?color=3B82F6)](https://github.com/nemoobc/opencode-termux/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/nemo-base-eth/opencode-termux/test.yml?label=test&color=22C55E)](.github/workflows/test.yml)
 [![platform](https://img.shields.io/badge/platform-Android%20%7C%20Termux-3DDC84)](#)
 [![arch](https://img.shields.io/badge/arch-arm64-blue)](#)
 [![sync upstream](https://img.shields.io/badge/sync-upstream%20otomatis-C9A227)](.github/workflows/sync-upstream.yml)
@@ -58,9 +59,16 @@ opencode-termux (shim Node)
 ## 🚀 Install
 
 ```bash
-pkg update && pkg install nodejs-lts
+pkg update && pkg install nodejs-lts tar
 npm i -g @nemoobc/opencode-termux
 ```
+
+> 📖 **Panduan lengkap** — persyaratan, verifikasi, update/uninstall,
+> troubleshooting, FAQ: [docs/INSTALASI.md](docs/INSTALASI.md)
+
+> 📦 **Tanpa Node / offline?** Ambil `opencode-termux-installer.sh` +
+> bundle `.tar.gz` dari [Releases](https://github.com/nemo-base-eth/opencode-termux/releases) —
+> installer murni POSIX sh, auto-detect arm64/x64, sha256 diverifikasi.
 
 > Jika muncul warning `install-scripts`, izinkan sekali:
 > ```bash
@@ -74,23 +82,44 @@ npm i -g @nemoobc/opencode-termux
 opencode-termux --version
 ```
 
-Alias biar terasa asli:
+### 🛠 Perintah bawaan CLI
+
+| Perintah | Fungsi |
+|---|---|
+| `opencode-termux` | Jalankan CLI opencode (argumen diteruskan) |
+| `opencode-termux update` | Perbarui binary ke upstream terbaru |
+| `opencode-termux doctor` | Diagnosis lingkungan & bundle (exit code jujur) |
+| `opencode-termux version` | Info versi paket + binary |
+
+> Identitas perintah konsisten satu nama: **`opencode-termux`** — tanpa alias,
+> tanpa nama lain, di semua dokumentasi, log, dan script internal.
+
+## 🧪 Tes
 
 ```bash
-ln -sf $PREFIX/bin/opencode-termux $PREFIX/bin/opencode
+npm test              # struktur + unit (cepat, tanpa unduhan besar)
+npm run test:e2e      # e2e penuh: install bundle + smoke test + subcommand
 ```
+
+CI GitHub menjalankan tes struktur di setiap push, plus **e2e arm64 sungguhan**
+(emulasi QEMU — loader musl prebuilt Termux benar-benar dieksekusi).
+
+## 🔒 Keamanan
+
+- Tarball binary diverifikasi **sha512** terhadap metadata resmi registry npm.
+- Unduhan memakai retry + backoff eksponensial (tahan jaringan gemetar).
 
 ## 📦 Versi
 
-Tiga versi terakhir selalu tersedia — [lihat semua](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions).
+Semua versi npm: [npmjs.com/@nemoobc/opencode-termux](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) ·
+Rilis & changelog: [GitHub Releases](https://github.com/nemo-base-eth/opencode-termux/releases)
 
-**Release notes** (ter-track di repo):
+## 🌐 Ekosistem
 
-| Versi | Notes |
+| Proyek | Fungsi |
 |---|---|
-| [v1.19.0](releases/v1.19.0.md) | agent + command + config otomatis + sync upstream |
-| [v1.18.26](releases/v1.18.26.md) | stabilisasi: DNS patch, smoke test, LD_PRELOAD |
-| [v1.18.24](releases/v1.18.24.md) | rilis pertama: native termux tanpa proot |
+| **[opencode-termux](https://github.com/nemo-base-eth/opencode-termux)** | CLI opencode native di Termux — repo ini |
+| **[opencode-android](https://github.com/nemo-base-eth/opencode-android)** | opencode sebagai aplikasi Android native ([unduh APK v1.5.0](https://github.com/nemoobc/opencode-android/releases/download/v1.5.0/OpenCode-v1.5.0.apk)) |
 
 ## 📄 Lisensi
 
