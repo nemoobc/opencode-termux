@@ -108,6 +108,32 @@ execFileSync(path.join(vendor, "ld-musl.so"),
   [path.join(vendor, "opencode"), "--version"],
   { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
 
+// 6) auto-install agents, commands & config opencode (tanpa menimpa milik user)
+try {
+  const HOME = process.env.HOME || "/data/data/com.termux/files/home"
+  const OC = path.join(HOME, ".config", "opencode")
+  for (const [srcDir, dstName] of [["agents", "agent"], ["commands", "command"]]) {
+    const src = path.join(__dirname, srcDir)
+    if (!fs.existsSync(src)) continue
+    const dst = path.join(OC, dstName)
+    fs.mkdirSync(dst, { recursive: true })
+    for (const f of fs.readdirSync(src)) {
+      fs.copyFileSync(path.join(src, f), path.join(dst, f))
+      console.log(`[opencode-termux] ✅ terpasang: ${dstName}/${f}`)
+    }
+  }
+  const cfgSrc = path.join(__dirname, "config", "opencode.json")
+  const cfgDst = path.join(OC, "opencode.json")
+  if (!fs.existsSync(cfgDst)) {
+    fs.copyFileSync(cfgSrc, cfgDst)
+    console.log("[opencode-termux] ✅ config default terpasang (model gratis)")
+  } else {
+    console.log("[opencode-termux] config user sudah ada — tidak disentuh")
+  }
+} catch (e) {
+  console.log("[opencode-termux] auto-install agent dilewati:", e.message)
+}
+
 fs.rmSync(work, { recursive: true, force: true })
 console.log(`[opencode-termux] ✅ siap!
 • global : jalankan 'opencode-termux'

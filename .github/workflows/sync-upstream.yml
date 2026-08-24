@@ -1,0 +1,40 @@
+name: sync upstream opencode
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cek & sesuaikan versi upstream
+        run: |
+          UP=$(curl -s https://registry.npmjs.org/opencode-ai/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          CUR=$(python3 -c "import json; print(json.load(open('package.json')).get('opencodeUpstream',''))")
+          echo "upstream=$UP | current=$CUR"
+          if [ "$UP" = "$CUR" ]; then echo "sudah sinkron"; exit 0; fi
+          sed -i "s|\"opencodeUpstream\": \"[^\"]*\"|\"opencodeUpstream\": \"$UP\"|" package.json
+          git config user.name "sync-bot"
+          git config user.email "sync@nemoobc.dev"
+          git add package.json
+          git commit -m "sync: upstream opencode-ai $UP"
+          git push
+      - name: publish npm (kalau NPM_TOKEN dipasang)
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN belum dipasang — skip publish"; exit 0; fi
+          python3 -c "
+          import json
+          p = json.load(open('package.json'))
+          v = p['version'].split('.')
+          v[-1] = str(int(v[-1]) + 1)
+          p['version'] = '.'.join(v)
+          json.dump(p, open('package.json','w'), indent=2)"
+          npm publish --access public || echo "publish gagal — cek manual"
+          git add package.json && git commit -m "chore: bump npm version" && git push || true
