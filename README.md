@@ -59,9 +59,12 @@ opencode-termux (shim Node)
 ## 🚀 Install
 
 ```bash
-pkg update && pkg install nodejs-lts
+pkg update && pkg install nodejs-lts tar
 npm i -g @nemoobc/opencode-termux
 ```
+
+> 📖 **Panduan lengkap** — persyaratan, verifikasi, update/uninstall,
+> troubleshooting, FAQ: [docs/INSTALASI.md](docs/INSTALASI.md)
 
 > Jika muncul warning `install-scripts`, izinkan sekali:
 > ```bash

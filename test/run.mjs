@@ -68,6 +68,13 @@ t("LICENSE: ada dan MIT", () => {
 t("package.json: script test:e2e terdaftar", () => {
   ok(typeof json("package.json").scripts["test:e2e"] === "string", "test:e2e hilang")
 })
+t("docs: panduan instalasi ada & tertaut dari README", () => {
+  ok(fs.existsSync(path.join(root, "docs/INSTALASI.md")), "docs/INSTALASI.md hilang")
+  const g = read("docs/INSTALASI.md")
+  ok(/Troubleshooting|troubleshooting/.test(g), "bagian troubleshooting hilang")
+  ok(/FAQ/.test(g), "bagian FAQ hilang")
+  ok(read("README.md").includes("docs/INSTALASI.md"), "README tidak menautkan panduan")
+})
 
 // ===== 3. agents & commands frontmatter =====
 t("agents: setiap file punya frontmatter description+mode+model", () => {
