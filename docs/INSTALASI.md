@@ -49,6 +49,21 @@ menjalankan smoke test. Selesai dalam ± 1 menit di jaringan normal.
 npx @nemoobc/opencode-termux --version
 ```
 
+### Alternatif tanpa Node / instalasi offline
+
+Untuk HP yang kesulitan `npm` (atau menyiapkan paket di PC lalu dipindahkan):
+
+1. Unduh 2 file dari [Releases](https://github.com/nemo-base-eth/opencode-termux/releases):
+   - `opencode-termux-installer.sh`
+   - `opencode-termux-<versi>-aarch64.tar.gz` (sesuai arsitektur)
+2. Taruh **di folder yang sama**, lalu:
+   ```bash
+   sh opencode-termux-installer.sh
+   ```
+
+Installer mendeteksi bundle offline di sebelahnya otomatis — tanpa internet,
+tanpa Node.js, checksum sha256 ikut terverifikasi via `SHA256SUMS.txt`.
+
 ## 4️⃣ Verifikasi
 
 ```bash

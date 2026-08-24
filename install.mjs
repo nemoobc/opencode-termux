@@ -115,11 +115,15 @@ try {
   ensureEtc()
 
   // 5) smoke test (LD_PRELOAD termux-exec dibuang: tidak kompatibel dengan musl)
-  log("smoke test…")
-  const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
-  execFileSync(path.join(vendor, "ld-musl.so"),
-    [path.join(vendor, "opencode"), "--version"],
-    { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
+  if (process.env.OCX_SKIP_SMOKE === "1") {
+    log("smoke test dilewati (OCX_SKIP_SMOKE=1 — mode cross-build)")
+  } else {
+    log("smoke test…")
+    const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
+    execFileSync(path.join(vendor, "ld-musl.so"),
+      [path.join(vendor, "opencode"), "--version"],
+      { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
+  }
 
   // 6) auto-install agents, commands & config opencode (tanpa menimpa milik user)
   try {

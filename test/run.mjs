@@ -121,6 +121,27 @@ t("workflow test: punya job e2e arm64 (validasi loader prebuilt)", () => {
   ok(/e2e-arm64:/.test(y), "job e2e-arm64 hilang")
   ok(/linux\/arm64/.test(y), "platform arm64 tidak dipakai")
 })
+t("workflow release: bangun & unggah 6 artefak otomatis", () => {
+  const y = read(".github/workflows/release.yml")
+  ok(/scripts\/build-release\.sh/.test(y), "build script dipanggil")
+  ok(/gh release (create|upload)/.test(y), "unggah ke releases")
+  ok(/tags:\s*\n\s+- "v\*"/.test(y), "pemicu tag v* hilang")
+})
+t("sync-upstream: bump versi ikut men-tag (pemicu rilis)", () => {
+  const y = read(".github/workflows/sync-upstream.yml")
+  ok(/git tag "v\$NEWVER"/.test(y), "penagangan otomatis hilang")
+})
+t("skrip rilis: sintaks valid & pola penting ada", () => {
+  execFileSync("bash", ["-n", path.join(root, "scripts/build-release.sh")])
+  execFileSync("sh", ["-n", path.join(root, "scripts/installer.sh")])
+  const b = read("scripts/build-release.sh")
+  for (const need of ["aarch64", "x86_64", "npm pack", "SHA256SUMS.txt", "-eq 6"]) {
+    ok(b.includes(need), `build-release kurang "${need}"`)
+  }
+  const i = read("scripts/installer.sh")
+  ok(i.includes("@VERSION@"), "placeholder versi hilang")
+  ok(i.includes("mode offline"), "mode offline hilang")
+})
 
 // ===== 6. prebuilt loader =====
 t("prebuilt loader: ELF aarch64 & executable", () => {
