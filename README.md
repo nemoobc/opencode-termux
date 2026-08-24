@@ -104,15 +104,15 @@ CI GitHub menjalankan tes struktur di setiap push, plus **e2e arm64 sungguhan**
 
 ## 📦 Versi
 
-Tiga versi terakhir selalu tersedia — [lihat semua](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions).
+Semua versi npm: [npmjs.com/@nemoobc/opencode-termux](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) ·
+Rilis & changelog: [GitHub Releases](https://github.com/nemo-base-eth/opencode-termux/releases)
 
-**Release notes** (ter-track di repo):
+## 🌐 Ekosistem
 
-| Versi | Notes |
+| Proyek | Fungsi |
 |---|---|
-| [v1.19.0](releases/v1.19.0.md) | agent + command + config otomatis + sync upstream |
-| [v1.18.26](releases/v1.18.26.md) | stabilisasi: DNS patch, smoke test, LD_PRELOAD |
-| [v1.18.24](releases/v1.18.24.md) | rilis pertama: native termux tanpa proot |
+| **[opencode-termux](https://github.com/nemo-base-eth/opencode-termux)** | CLI opencode native di Termux — repo ini |
+| **[opencode-android](https://github.com/nemo-base-eth/opencode-android)** | opencode sebagai aplikasi Android native ([unduh APK v1.5.0](https://github.com/nemoobc/opencode-android/releases/download/v1.5.0/OpenCode-v1.5.0.apk)) |
 
 ## 📄 Lisensi
 
