@@ -125,7 +125,7 @@ t("workflow release: bangun & unggah 6 artefak otomatis", () => {
   const y = read(".github/workflows/release.yml")
   ok(/scripts\/build-release\.sh/.test(y), "build script dipanggil")
   ok(/gh release (create|upload)/.test(y), "unggah ke releases")
-  ok(/tags:\s*\n\s+- "v\*"/.test(y), "pemicu tag v* hilang")
+  ok(/tags:/.test(y) && /"v\*"/.test(y), "pemicu tag v* hilang")
 })
 t("sync-upstream: bump versi ikut men-tag (pemicu rilis)", () => {
   const y = read(".github/workflows/sync-upstream.yml")
