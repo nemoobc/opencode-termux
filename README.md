@@ -67,13 +67,6 @@ opencode-termux --version
 - Binary diverifikasi **sha512** terhadap metadata registry npm.
 - Workflow mengecek upstream [opencode-ai](https://github.com/anomalyco/opencode) tiap 6 jam dan auto-sinkron.
 
-## 🌐 Ekosistem
-
-| Proyek | Fungsi |
-|---|---|
-| **[opencode-termux](../../)** | CLI opencode native di Termux — repo ini |
-| **[opencode-android](https://github.com/nemoobc/opencode-android)** | opencode sebagai aplikasi Android native ([unduh APK](https://github.com/nemoobc/opencode-android/releases)) |
-
 ## 📄 Lisensi
 
 MIT. Binary opencode resmi dari upstream — paket ini hanya membungkus + menambah agent.
