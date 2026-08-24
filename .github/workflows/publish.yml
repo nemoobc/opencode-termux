@@ -1,0 +1,36 @@
+name: Publish GitHub Packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: Pastikan versi package.json sama dengan tag rilis
+        run: |
+          PKG_VER="v$(node -p "require('./package.json').version")"
+          TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          echo "package.json=$PKG_VER | tag=$TAG"
+          [ "$PKG_VER" = "$TAG" ] || { echo "::error::Versi package.json ($PKG_VER) != tag ($TAG)"; exit 1; }
+
+      - name: Pakai readme lengkap untuk registry
+        run: 'cp .github/NPM_README.md README.md 2>/dev/null || true'
+
+      - name: Publish ke GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
