@@ -48,6 +48,10 @@ jobs:
           echo "tag v$NEWVER didorong -> workflow release otomatis membangun 6 artefak"
           echo "synced=true" >> "$GITHUB_OUTPUT"
 
+      - name: Pakai readme lengkap untuk registry
+        if: steps.sync.outputs.synced == 'true'
+        run: '[ -f .github/NPM_README.md ] && cp .github/NPM_README.md README.md'
+
       - name: publish npm (kalau NPM_TOKEN dipasang)
         if: steps.sync.outputs.synced == 'true'
         env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
