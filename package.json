@@ -28,7 +28,7 @@
     "commands",
     "config"
   ],
-  "opencodeUpstream": "1.18.21",
+  "opencodeUpstream": "1.18.22",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nemoobc/opencode-termux.git"
