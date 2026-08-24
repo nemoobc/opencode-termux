@@ -6,7 +6,8 @@
     "opencode-termux": "./bin/opencode.js"
   },
   "scripts": {
-    "postinstall": "node install.mjs"
+    "postinstall": "node install.mjs",
+    "test": "node test/run.mjs"
   },
   "keywords": [
     "opencode",
@@ -22,13 +23,14 @@
   "files": [
     "bin",
     "install.mjs",
+    "lib",
     "prebuilt",
     "README.md",
     "agents",
     "commands",
     "config"
   ],
-  "opencodeUpstream": "1.18.21",
+  "opencodeUpstream": "1.18.22",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nemoobc/opencode-termux.git"

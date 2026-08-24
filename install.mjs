@@ -11,6 +11,7 @@ import { execFileSync } from "child_process"
 import { Readable } from "stream"
 import { pipeline } from "stream/promises"
 import { fileURLToPath } from "url"
+import { alpinePkg } from "./lib/alpine.mjs"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"))
@@ -25,9 +26,6 @@ if (!V) {
   V = latest.version
   console.log(`[opencode-termux] upstream opencode-ai terbaru: ${V}`)
 }
-const GLOBAL_HINT =
-  process.platform === "win32" ? "" : ""
-
 if (!IS_ANDROID && !FORCE) {
   console.log("[opencode-termux] Bukan Termux/Android — instalasi dilewati (pakai opencode-ai resmi).")
   process.exit(0)
@@ -56,13 +54,17 @@ fs.rmSync(work, { recursive: true, force: true })
 fs.mkdirSync(work, { recursive: true })
 const AV = "v3.21", AL = "3.21.3"
 
+// Resolusi dinamis paket Alpine dari CDN (lihat lib/alpine.mjs)
+const pkg = name => alpinePkg(fetch, `https://dl-cdn.alpinelinux.org/alpine/${AV}/main/${A}`, name)
+
 // 1) binary opencode (musl) dari npm resmi
 await dl(`https://registry.npmjs.org/opencode-linux-${ARCH}-musl/-/opencode-linux-${ARCH}-musl-${V}.tgz`, `${work}/oc.tgz`)
 untar(`${work}/oc.tgz`, `${work}/oc`)
 
-// 2) libgcc + libstdc++
+// 2) libgcc + libstdc++ (versi terbaru yang tersedia di CDN)
 const apkDir = `${work}/apk`; fs.mkdirSync(apkDir, { recursive: true })
-for (const f of [`libgcc-14.2.0-r4.apk`, `libstdc%2B%2B-14.2.0-r4.apk`]) {
+for (const name of ["libgcc", "libstdc%2B%2B"]) {
+  const f = await pkg(name)
   await dl(`https://dl-cdn.alpinelinux.org/alpine/${AV}/main/${A}/${f}`, `${apkDir}/${f}`)
   untar(`${apkDir}/${f}`, apkDir)
 }

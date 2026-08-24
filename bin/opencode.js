@@ -45,4 +45,9 @@ const r = spawnSync(loader, [bin, ...process.argv.slice(2)], {
   stdio: "inherit",
   env: { ...cleanEnv, LD_LIBRARY_PATH: vendor },
 })
-process.exit(r.status ?? 1)
+if (r.error) {
+  console.error("[opencode-termux] gagal menjalankan binary:", r.error.message)
+  process.exit(1)
+}
+const sigExit = { SIGINT: 130, SIGQUIT: 131, SIGTERM: 143 }
+process.exit(r.status ?? sigExit[r.signal] ?? 1)
