@@ -20,8 +20,8 @@ jobs:
           echo "upstream=$UP | current=$CUR"
           if [ "$UP" = "$CUR" ]; then echo "sudah sinkron"; exit 0; fi
           sed -i "s|\"opencodeUpstream\": \"[^\"]*\"|\"opencodeUpstream\": \"$UP\"|" package.json
-          git config user.name "sync-bot"
-          git config user.email "sync@nemoobc.dev"
+          git config user.name "nemoobc"
+          git config user.email "258114617+nemoobc@users.noreply.github.com"
           git add package.json
           git commit -m "sync: upstream opencode-ai $UP"
           git push

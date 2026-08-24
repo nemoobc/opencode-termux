@@ -1,0 +1,21 @@
+name: bersihkan actions gagal
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          HAPUS=0
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.conclusion=="failure") | .id'); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$id" >/dev/null 2>&1 && HAPUS=$((HAPUS+1))
+          done
+          echo "dihapus: $HAPUS run gagal (yang centang dibiarkan)"
