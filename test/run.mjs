@@ -6,9 +6,14 @@
  */
 import fs from "fs"
 import path from "path"
-import { execFileSync } from "child_process"
+import crypto from "crypto"
+import { execFileSync, spawnSync } from "child_process"
 import { fileURLToPath } from "url"
 import { cmpVer, alpinePkg } from "../lib/alpine.mjs"
+import { fetchWithRetry } from "../lib/net.mjs"
+import { expectedFromRegistry, verifySha512 } from "../lib/integrity.mjs"
+
+const E2E = process.env.OCX_E2E === "1" || process.argv.includes("--e2e")
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..")
 let pass = 0, fail = 0
@@ -50,9 +55,19 @@ t("package.json: pin upstream == upstream opencode-ai terbaru", () => {
 })
 
 // ===== 2. sintaks =====
-for (const f of ["bin/opencode.js", "install.mjs", "lib/alpine.mjs"]) {
+for (const f of ["bin/opencode.js", "install.mjs",
+  ...fs.readdirSync(path.join(root, "lib")).map(x => `lib/${x}`)]) {
   t(`sintaks: ${f}`, () => execFileSync(process.execPath, ["--check", path.join(root, f)], { stdio: "pipe" }))
 }
+
+// ===== 2b. lisensi & skrip =====
+t("LICENSE: ada dan MIT", () => {
+  ok(fs.existsSync(path.join(root, "LICENSE")), "file LICENSE hilang")
+  ok(/MIT License/.test(read("LICENSE")), "LICENSE bukan MIT")
+})
+t("package.json: script test:e2e terdaftar", () => {
+  ok(typeof json("package.json").scripts["test:e2e"] === "string", "test:e2e hilang")
+})
 
 // ===== 3. agents & commands frontmatter =====
 t("agents: setiap file punya frontmatter description+mode+model", () => {
@@ -94,6 +109,11 @@ t("workflow bersihkan: permission actions + loop delete", () => {
   ok(/permissions:\s*\n\s*actions: write/.test(y), "permission actions: write hilang")
   ok(/DELETE/.test(y), "tidak ada panggilan DELETE run gagal")
 })
+t("workflow test: punya job e2e arm64 (validasi loader prebuilt)", () => {
+  const y = read(".github/workflows/test.yml")
+  ok(/e2e-arm64:/.test(y), "job e2e-arm64 hilang")
+  ok(/linux\/arm64/.test(y), "platform arm64 tidak dipakai")
+})
 
 // ===== 6. prebuilt loader =====
 t("prebuilt loader: ELF aarch64 & executable", () => {
@@ -128,6 +148,52 @@ t("alpinePkg (integrasi): listing CDN asli bisa diresolve", async () => {
   console.log(`   └─ resolved: ${got}`)
 })
 
+// ===== 7b. unit retry jaringan =====
+t("fetchWithRetry: sukses setelah gagal sementara", async () => {
+  let calls = 0
+  const fetchFn = async () => { calls++; if (calls < 3) throw new Error("down"); return { ok: true } }
+  const res = await fetchWithRetry(fetchFn, "https://x", {}, 3)
+  ok(res.ok, "hasil tidak ok")
+  ok(calls === 3, `panggilan = ${calls}, harus 3`)
+})
+t("fetchWithRetry: 404 gagal permanen tanpa retry", async () => {
+  let calls = 0
+  const fetchFn = async () => { calls++; return { ok: false, status: 404 } }
+  await fetchWithRetry(fetchFn, "https://x", {}, 3)
+  ok(calls === 1, `harus berhenti di 1 panggilan, dapat ${calls}`)
+})
+t("fetchWithRetry: habis retry melempar error terakhir", async () => {
+  const fetchFn = async () => { throw new Error("selalu gagal") }
+  let thrown = null
+  try { await fetchWithRetry(fetchFn, "https://x", {}, 2) } catch (e) { thrown = e }
+  ok(thrown && /selalu gagal/.test(thrown.message), "error tidak dilempar")
+})
+t("fetchWithRetry: 5xx di-retry", async () => {
+  let calls = 0
+  const fetchFn = async () => { calls++; return { ok: calls > 1, status: calls > 1 ? 200 : 503 } }
+  const res = await fetchWithRetry(fetchFn, "https://x", {}, 3)
+  ok(res.ok && calls === 2, `503 tidak diretry (calls=${calls})`)
+})
+
+// ===== 7c. unit integritas =====
+t("verifySha512: file cocok hash diterima", () => {
+  const dir = fs.mkdtempSync(path.join(root, ".build-test-"))
+  try {
+    const f = path.join(dir, "sample")
+    fs.writeFileSync(f, "payload uji")
+    const want = crypto.createHash("sha512").update("payload uji").digest("base64")
+    ok(verifySha512(f, want), "verifikasi valid salah gagal")
+    let threw = null
+    try { verifySha512(f, Buffer.alloc(64).toString("base64")) } catch (e) { threw = e }
+    ok(threw, "hash salah harus ditolak")
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+t("expectedFromRegistry: ambil integrity dari packument", () => {
+  const pk = { versions: { "1.0.0": { dist: { integrity: "sha512-QUJD" } } } }
+  ok(expectedFromRegistry(pk, "1.0.0") === "QUJD", "gagal ekstrak")
+  ok(expectedFromRegistry(pk, "9.9.9") === null, "versi asing harus null")
+})
+
 // ===== 8. git hygiene =====
 t("git: tidak ada tarball/artefak build yang ter-track", () => {
   const ls = execFileSync("git", ["ls-files"], { cwd: root }).toString().split("\n").filter(Boolean)
@@ -142,9 +208,9 @@ t("gitignore: mencakup vendor/, .build/, node_modules/, *.tgz", () => {
   for (const need of ["vendor/", ".build/", "node_modules/", "*.tgz"]) ok(g.includes(need), `.gitignore kurang ${need}`)
 })
 
-// ===== 9. E2E opsional =====
-if (process.env.OCX_E2E === "1") {
-  console.log("\n🔧 mode E2E: instalasi bundle x64 + smoke test…")
+// ===== 9. E2E opsional (--e2e atau OCX_E2E=1) =====
+if (E2E) {
+  console.log("\n🔧 mode E2E: instalasi bundle x64 + smoke test + subcommand…")
   t("e2e: install.mjs selesai tanpa error (OCX_ARCH=x64 OCX_FORCE=1)", () => {
     execFileSync(process.execPath, [path.join(root, "install.mjs")], {
       stdio: "inherit",
@@ -158,6 +224,22 @@ if (process.env.OCX_E2E === "1") {
     })
     ok(/\d+\.\d+\.\d+/.test(out), `output tak dikenal: ${out.trim()}`)
     console.log(`   └─ version: ${out.trim()}`)
+  })
+  t("e2e: subcommand version mencetak versi paket & binary", () => {
+    const out = execFileSync(process.execPath, [path.join(root, "bin/opencode.js"), "version"], {
+      encoding: "utf8", env: process.env, cwd: root,
+    })
+    ok(out.includes(`v${json("package.json").version}`), "versi paket tidak tercetak")
+    ok(/binary \d+\.\d+\.\d+/.test(out), "versi binary tidak tercetak")
+    console.log(`   └─ ${out.trim()}`)
+  })
+  t("e2e: subcommand doctor sehat (exit 0)", () => {
+    const r = spawnSync(process.execPath, [path.join(root, "bin/opencode.js"), "doctor"], {
+      encoding: "utf8", env: { ...process.env, TERMUX_PREFIX: path.join(root, ".build-test-prefix") },
+      cwd: root,
+    })
+    console.log(r.stdout.split("\n").map(l => `   ${l}`).join("\n"))
+    ok(r.status === 0, `doctor exit ${r.status}\n${r.stdout}`)
   })
 }
 

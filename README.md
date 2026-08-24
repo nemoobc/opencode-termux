@@ -4,6 +4,7 @@
 
 [![npm](https://img.shields.io/npm/v/@nemoobc/opencode-termux?color=cb3837&logo=npm)](https://www.npmjs.com/package/@nemoobc/opencode-termux)
 [![release](https://img.shields.io/github/v/release/nemoobc/opencode-termux?color=3B82F6)](https://github.com/nemoobc/opencode-termux/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/nemo-base-eth/opencode-termux/test.yml?label=test&color=22C55E)](.github/workflows/test.yml)
 [![platform](https://img.shields.io/badge/platform-Android%20%7C%20Termux-3DDC84)](#)
 [![arch](https://img.shields.io/badge/arch-arm64-blue)](#)
 [![sync upstream](https://img.shields.io/badge/sync-upstream%20otomatis-C9A227)](.github/workflows/sync-upstream.yml)
@@ -74,11 +75,35 @@ npm i -g @nemoobc/opencode-termux
 opencode-termux --version
 ```
 
+### 🛠 Perintah bawaan CLI
+
+| Perintah | Fungsi |
+|---|---|
+| `opencode-termux` | Jalankan CLI opencode (argumen diteruskan) |
+| `opencode-termux update` | Perbarui binary ke upstream terbaru |
+| `opencode-termux doctor` | Diagnosis lingkungan & bundle (exit code jujur) |
+| `opencode-termux version` | Info versi paket + binary |
+
 Alias biar terasa asli:
 
 ```bash
 ln -sf $PREFIX/bin/opencode-termux $PREFIX/bin/opencode
 ```
+
+## 🧪 Tes
+
+```bash
+npm test              # struktur + unit (cepat, tanpa unduhan besar)
+npm run test:e2e      # e2e penuh: install bundle + smoke test + subcommand
+```
+
+CI GitHub menjalankan tes struktur di setiap push, plus **e2e arm64 sungguhan**
+(emulasi QEMU — loader musl prebuilt Termux benar-benar dieksekusi).
+
+## 🔒 Keamanan
+
+- Tarball binary diverifikasi **sha512** terhadap metadata resmi registry npm.
+- Unduhan memakai retry + backoff eksponensial (tahan jaringan gemetar).
 
 ## 📦 Versi
 
