@@ -84,6 +84,14 @@ ln -sf $PREFIX/bin/opencode-termux $PREFIX/bin/opencode
 
 Tiga versi terakhir selalu tersedia — [lihat semua](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions).
 
+**Release notes** (ter-track di repo):
+
+| Versi | Notes |
+|---|---|
+| [v1.19.0](releases/v1.19.0.md) | agent + command + config otomatis + sync upstream |
+| [v1.18.26](releases/v1.18.26.md) | stabilisasi: DNS patch, smoke test, LD_PRELOAD |
+| [v1.18.24](releases/v1.18.24.md) | rilis pertama: native termux tanpa proot |
+
 ## 📄 Lisensi
 
 MIT. Binary opencode resmi dari upstream — paket ini hanya membungkus + menambah agent.
