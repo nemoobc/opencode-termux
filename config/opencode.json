@@ -1,15 +1,4 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "zen": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Zen (OpenCode)",
-      "options": { "baseURL": "https://opencode.ai/zen/v1" },
-      "models": {
-        "big-pickle": { "name": "Big Pickle — tercepat" },
-        "x-preview-f-free": { "name": "0x Alpha Free (Unlimited)" }
-      }
-    }
-  },
-  "model": "zen/big-pickle"
+  "model": "opencode/big-pickle"
 }
