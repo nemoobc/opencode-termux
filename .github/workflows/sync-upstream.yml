@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   sync:
@@ -17,6 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - id: sync
         name: cek & sesuaikan versi upstream
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
           UP=$(curl -sf https://registry.npmjs.org/opencode-ai/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
           CUR=$(python3 -c "import json; print(json.load(open('package.json')).get('opencodeUpstream',''))")
@@ -27,25 +29,32 @@ jobs:
             exit 0
           fi
           sed -i "s|\"opencodeUpstream\": \"[^\"]*\"|\"opencodeUpstream\": \"$UP\"|" package.json
-          python3 - <<'PYEOF'
-          import json
+          NEWVER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
+          # anti-bentrok: versi baru harus bebas di TAG lokal & remote, dan belum ada di npm
+          until ! git ls-remote --exit-code --tags origin "refs/tags/v$NEWVER" >/dev/null 2>&1 \
+                && ! npm view "@nemoobc/opencode-termux@$NEWVER" version >/dev/null 2>&1; do
+            echo "v$NEWVER sudah terpakai (tag/npm) — naikkan"
+            NEWVER=$(python3 -c "import sys; a=sys.argv[1].split('.'); a[-1]=str(int(a[-1])+1); print('.'.join(a))" "$NEWVER")
+          done
+          python3 - "$NEWVER" <<'PYEOF'
+          import json, sys
           p = json.load(open('package.json'))
-          v = p['version'].split('.')
-          v[-1] = str(int(v[-1]) + 1)
-          p['version'] = '.'.join(v)
+          p['version'] = sys.argv[1]
           with open('package.json', 'w') as f:
               json.dump(p, f, indent=2)
               f.write('\n')
           PYEOF
           git config user.name "nemoobc"
           git config user.email "258114617+nemoobc@users.noreply.github.com"
-          NEWVER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
           git add package.json
           git commit -m "sync: upstream opencode-ai $UP"
           git tag "v$NEWVER"
           git push
           git push origin "v$NEWVER"
-          echo "tag v$NEWVER didorong -> workflow release otomatis membangun 6 artefak"
+          # GITHUB_TOKEN tidak pernah memicu workflow via push-tag (aturan anti-rekursi GitHub),
+          # jadi release dipicu eksplisit via workflow_dispatch (pengecualian resmi).
+          gh workflow run release.yml --ref "v$NEWVER"
+          echo "tag v$NEWVER didorong + release.yml di-dispatch -> 6 artefak dibangun"
           echo "synced=true" >> "$GITHUB_OUTPUT"
 
       - name: publish npm (kalau NPM_TOKEN dipasang)
