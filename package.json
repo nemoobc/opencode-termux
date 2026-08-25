@@ -1,7 +1,7 @@
 {
   "name": "@nemoobc/opencode-termux",
-  "version": "1.20.1",
-  "description": "opencode CLI native untuk Termux/Android tanpa proot — membundel loader musl + binary opencode resmi (upstream opencode-ai)",
+  "version": "1.20.3",
+  "description": "opencode CLI native untuk Termux/Android tanpa proot \u2014 membundel loader musl + binary opencode resmi (upstream opencode-ai)",
   "bin": {
     "opencode-termux": "./bin/opencode-termux.js"
   },
@@ -32,7 +32,7 @@
     "commands",
     "config"
   ],
-  "opencodeUpstream": "1.18.22",
+  "opencodeUpstream": "1.18.23",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/nemoobc/opencode-termux.git"
