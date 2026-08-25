@@ -53,7 +53,7 @@ npx @nemoobc/opencode-termux --version
 
 Untuk HP yang kesulitan `npm` (atau menyiapkan paket di PC lalu dipindahkan):
 
-1. Unduh 2 file dari [Releases](https://github.com/nemo-base-eth/opencode-termux/releases):
+1. Unduh 2 file dari [Releases](https://github.com/nemoobc/opencode-termux/releases):
    - `opencode-termux-installer.sh`
    - `opencode-termux-<versi>-aarch64.tar.gz` (sesuai arsitektur)
 2. Taruh **di folder yang sama**, lalu:

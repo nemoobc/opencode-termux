@@ -4,7 +4,7 @@
 
 [![npm](https://img.shields.io/npm/v/@nemoobc/opencode-termux?color=cb3837&logo=npm)](https://www.npmjs.com/package/@nemoobc/opencode-termux)
 [![release](https://img.shields.io/github/v/release/nemoobc/opencode-termux?color=3B82F6)](https://github.com/nemoobc/opencode-termux/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/nemo-base-eth/opencode-termux/test.yml?label=test&color=22C55E)](.github/workflows/test.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/nemoobc/opencode-termux/test.yml?label=test&color=22C55E)](.github/workflows/test.yml)
 [![platform](https://img.shields.io/badge/platform-Android%20%7C%20Termux-3DDC84)](#)
 [![arch](https://img.shields.io/badge/arch-arm64-blue)](#)
 [![sync upstream](https://img.shields.io/badge/sync-upstream%20otomatis-C9A227)](.github/workflows/sync-upstream.yml)
@@ -67,7 +67,7 @@ npm i -g @nemoobc/opencode-termux
 > troubleshooting, FAQ: [docs/INSTALASI.md](docs/INSTALASI.md)
 
 > 📦 **Tanpa Node / offline?** Ambil `opencode-termux-installer.sh` +
-> bundle `.tar.gz` dari [Releases](https://github.com/nemo-base-eth/opencode-termux/releases) —
+> bundle `.tar.gz` dari [Releases](https://github.com/nemoobc/opencode-termux/releases) —
 > installer murni POSIX sh, auto-detect arm64/x64, sha256 diverifikasi.
 
 > Jika muncul warning `install-scripts`, izinkan sekali:
@@ -112,14 +112,14 @@ CI GitHub menjalankan tes struktur di setiap push, plus **e2e arm64 sungguhan**
 ## 📦 Versi
 
 Semua versi npm: [npmjs.com/@nemoobc/opencode-termux](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) ·
-Rilis & changelog: [GitHub Releases](https://github.com/nemo-base-eth/opencode-termux/releases)
+Rilis & changelog: [GitHub Releases](https://github.com/nemoobc/opencode-termux/releases)
 
 ## 🌐 Ekosistem
 
 | Proyek | Fungsi |
 |---|---|
-| **[opencode-termux](https://github.com/nemo-base-eth/opencode-termux)** | CLI opencode native di Termux — repo ini |
-| **[opencode-android](https://github.com/nemo-base-eth/opencode-android)** | opencode sebagai aplikasi Android native ([unduh APK v1.5.0](https://github.com/nemoobc/opencode-android/releases/download/v1.5.0/OpenCode-v1.5.0.apk)) |
+| **[opencode-termux](https://github.com/nemoobc/opencode-termux)** | CLI opencode native di Termux — repo ini |
+| **[opencode-android](https://github.com/nemoobc/opencode-android)** | opencode sebagai aplikasi Android native ([unduh APK v1.5.0](https://github.com/nemoobc/opencode-android/releases/download/v1.5.0/OpenCode-v1.5.0.apk)) |
 
 ## 📄 Lisensi
 

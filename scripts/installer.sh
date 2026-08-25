@@ -6,7 +6,7 @@
 set -eu
 
 VERSION="@VERSION@"
-REPO="nemo-base-eth/opencode-termux"
+REPO="nemoobc/opencode-termux"
 BASE="https://github.com/$REPO/releases/download/v$VERSION"
 
 say() { printf '[opencode-termux] %s\n' "$*"; }
