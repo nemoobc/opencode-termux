@@ -1,0 +1,60 @@
+name: sync upstream opencode
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      synced: ${{ steps.sync.outputs.synced }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: sync
+        name: cek & sesuaikan versi upstream
+        run: |
+          UP=$(curl -sf https://registry.npmjs.org/opencode-ai/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          CUR=$(python3 -c "import json; print(json.load(open('package.json')).get('opencodeUpstream',''))")
+          echo "upstream=$UP | current=$CUR"
+          if [ "$UP" = "$CUR" ]; then
+            echo "sudah sinkron — tidak ada yang dilakukan"
+            echo "synced=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sed -i "s|\"opencodeUpstream\": \"[^\"]*\"|\"opencodeUpstream\": \"$UP\"|" package.json
+          python3 - <<'PYEOF'
+          import json
+          p = json.load(open('package.json'))
+          v = p['version'].split('.')
+          v[-1] = str(int(v[-1]) + 1)
+          p['version'] = '.'.join(v)
+          with open('package.json', 'w') as f:
+              json.dump(p, f, indent=2)
+              f.write('\n')
+          PYEOF
+          git config user.name "nemoobc"
+          git config user.email "258114617+nemoobc@users.noreply.github.com"
+          NEWVER=$(python3 -c "import json; print(json.load(open('package.json'))['version'])")
+          git add package.json
+          git commit -m "sync: upstream opencode-ai $UP"
+          git tag "v$NEWVER"
+          git push
+          git push origin "v$NEWVER"
+          echo "tag v$NEWVER didorong -> workflow release otomatis membangun 6 artefak"
+          echo "synced=true" >> "$GITHUB_OUTPUT"
+
+      - name: Pakai readme lengkap untuk registry
+        if: steps.sync.outputs.synced == 'true'
+        run: 'cp .github/NPM_README.md README.md 2>/dev/null || true'
+
+      - name: publish npm (kalau NPM_TOKEN dipasang)
+        if: steps.sync.outputs.synced == 'true'
+        env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN belum dipasang — skip publish"; exit 0; fi
+          npm publish --access public || echo "publish gagal — cek manual"

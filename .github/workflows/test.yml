@@ -1,0 +1,43 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  structure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: struktur + unit test
+        run: node test/run.mjs
+
+  e2e-x64:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: e2e penuh x64 (unduh bundle + smoke test + subcommand)
+        env: { OCX_E2E: "1" }
+        run: node test/run.mjs
+
+  e2e-arm64:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: QEMU untuk emulasi arm64
+        uses: docker/setup-qemu-action@v3
+      - name: e2e arm64 native-emulasi (loader prebuilt Termux diuji sungguhan)
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "$PWD":/w -w /w \
+            -e OCX_FORCE=1 -e HOME=/tmp \
+            node:20-alpine \
+            sh -c "apk add --no-cache tar >/dev/null 2>&1; node install.mjs && ./vendor/ld-musl.so ./vendor/opencode --version"

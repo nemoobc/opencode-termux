@@ -1,0 +1,7 @@
+node_modules/
+vendor/
+.build/
+*.tgz
+
+# artefak rilis dibangun otomatis oleh workflow release — jangan di-track
+dist/

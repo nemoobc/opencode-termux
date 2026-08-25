@@ -1,42 +1,41 @@
 {
-  "name": "opencode-termux",
-  "version": "1.18.23-0",
-  "description": "OpenCode AI assistant compiled for Android Termux (aarch64) with auto-update support",
-  "main": "bin/opencode",
+  "name": "@nemoobc/opencode-termux",
+  "version": "1.20.2",
+  "description": "opencode CLI native untuk Termux/Android tanpa proot \u2014 membundel loader musl + binary opencode resmi (upstream opencode-ai)",
   "bin": {
-    "opencode": "bin/opencode"
+    "opencode-termux": "./bin/opencode-termux.js"
+  },
+  "scripts": {
+    "postinstall": "node install.mjs",
+    "test": "node test/run.mjs",
+    "test:e2e": "node test/run.mjs --e2e"
   },
   "keywords": [
     "opencode",
     "termux",
     "android",
-    "ai",
     "cli",
-    "assistant",
-    "coding",
-    "code-agent",
-    "terminal",
-    "aarch64",
-    "arm64",
-    "musl"
+    "ai"
   ],
-  "author": "C04-wq",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/C04-wq/opencode-termux.git"
-  },
-  "homepage": "https://github.com/C04-wq/opencode-termux#readme",
-  "bugs": {
-    "url": "https://github.com/C04-wq/opencode-termux/issues"
+  "engines": {
+    "node": ">=18"
   },
   "files": [
-    "bin/",
-    "install.js",
-    "release-checksums.json",
-    "README.md"
+    "bin",
+    "install.mjs",
+    "lib",
+    "prebuilt",
+    "LICENSE",
+    "README.md",
+    "agents",
+    "commands",
+    "config"
   ],
-  "engines": {
-    "node": ">=14.14"
-  }
+  "opencodeUpstream": "1.18.23",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nemoobc/opencode-termux.git"
+  },
+  "homepage": "https://github.com/nemoobc/opencode-termux#readme"
 }
