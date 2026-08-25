@@ -139,6 +139,15 @@ try {
         log(`✅ terpasang: ${dstName}/${f}`)
       }
     }
+    const plugSrc = path.join(__dirname, "plugin")
+    if (fs.existsSync(plugSrc)) {
+      const plugDst = path.join(OC, "plugin")
+      fs.mkdirSync(plugDst, { recursive: true })
+      for (const f of fs.readdirSync(plugSrc)) {
+        fs.copyFileSync(path.join(plugSrc, f), path.join(plugDst, f))
+        log(`✅ terpasang: plugin/${f}`)
+      }
+    }
     const cfgSrc = path.join(__dirname, "config", "opencode.json")
     const cfgDst = path.join(OC, "opencode.json")
     if (!fs.existsSync(cfgDst)) {

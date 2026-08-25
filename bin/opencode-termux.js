@@ -173,7 +173,17 @@ pakai:
     return 0
   }
   if (!heal()) return 1
-  return runBinary(process.argv.slice(2))
+  const code = runBinary(process.argv.slice(2))
+  // banner perpisahan setelah sesi TUI ditutup
+  if (process.argv[2] === undefined) {
+    console.log("")
+    console.log("[2m█▀▀█ █▀▀█ █▀▀▀ █▀▀▄ █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀  ────  ▀▀▀▀ █▀▀▀ █▀▀█ █▄▄█ █  █ ▀▄ ▄▀[0m")
+    console.log("[2m█  █ █▀▀█ █▀▀  █▄▄▀ █▀▀  █  █ █  █ █▀▀  ────    █    █▄▄▀ █▄▄█ █  █ █  █  █  [0m")
+    console.log("[2m▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀  ────  ▀▀▀▀ ▀ ▀▀ ▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀ ▀▀[0m")
+    console.log("")
+    console.log("[2m                    jalankan lagi: [0m[1;32mopencode-termux[0m")
+  }
+  return code
 }
 
 main().then(code => process.exit(code)).catch(e => {
