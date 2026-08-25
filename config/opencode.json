@@ -7,7 +7,7 @@
       "options": { "baseURL": "https://opencode.ai/zen/v1" },
       "models": {
         "big-pickle": { "name": "Big Pickle — tercepat" },
-        "x-preview-f-free": { "name": "X Preview Free" }
+        "x-preview-f-free": { "name": "0x Alpha Free (Unlimited)" }
       }
     }
   },
