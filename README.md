@@ -114,13 +114,6 @@ CI GitHub menjalankan tes struktur di setiap push, plus **e2e arm64 sungguhan**
 Semua versi npm: [npmjs.com/@nemoobc/opencode-termux](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) ·
 Rilis & changelog: [GitHub Releases](https://github.com/nemoobc/opencode-termux/releases)
 
-## 🌐 Ekosistem
-
-| Proyek | Fungsi |
-|---|---|
-| **[opencode-termux](https://github.com/nemoobc/opencode-termux)** | CLI opencode native di Termux — repo ini |
-| **[opencode-android](https://github.com/nemoobc/opencode-android)** | opencode sebagai aplikasi Android native ([unduh APK v1.5.0](https://github.com/nemoobc/opencode-android/releases/download/v1.5.0/OpenCode-v1.5.0.apk)) |
-
 ## 📄 Lisensi
 
 MIT. Binary opencode resmi dari upstream — paket ini hanya membungkus + menambah agent.
