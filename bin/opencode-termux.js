@@ -2,6 +2,7 @@
 const { spawnSync } = require("child_process")
 const fs = require("fs")
 const path = require("path")
+const os = require("os")
 const root = path.join(__dirname, "..")
 const vendor = path.join(root, "vendor")
 const loader = path.join(vendor, "ld-musl.so")
@@ -158,11 +159,75 @@ function cmdVersion() {
   return 0
 }
 
+/* ---------- models / status / model ---------- */
+const ZEN = "https://opencode.ai/zen/v1"
+const OC_CFG = path.join(os.homedir(), ".config", "opencode", "opencode.json")
+
+async function cmdModels() {
+  try {
+    const r = await fetch(ZEN + "/models")
+    const j = await r.json()
+    let aktif = ""
+    try { aktif = JSON.parse(fs.readFileSync(OC_CFG, "utf8")).model || "" } catch {}
+    console.log("model relay opencode (" + (j.data?.length || 0) + "):")
+    for (const m of j.data || []) {
+      const full = "opencode/" + m.id
+      console.log((full === aktif ? " → " : "   ") + m.id)
+    }
+    if (aktif) console.log("\naktif: " + aktif)
+    return 0
+  } catch (e) {
+    console.error("zen tidak terjangkau:", e.message)
+    return 1
+  }
+}
+
+async function cmdStatus() {
+  let model = "-"
+  try { model = JSON.parse(fs.readFileSync(OC_CFG, "utf8")).model || "-" } catch {}
+  let zen = "DOWN"
+  try { const r = await fetch(ZEN + "/models"); zen = "HTTP " + r.status + (r.ok ? " ✓" : " (limit?)") } catch { zen = "tidak terjangkau" }
+  let bundle = "-"
+  try { bundle = (require("child_process").execSync("du -sh " + JSON.stringify(path.join(root, "vendor"))).toString().split("	")[0]) } catch {}
+  let disk = "-"
+  try { disk = require("child_process").execSync("df -h /data/data/com.termux/files/home | tail -1 | awk '{print $4}'").toString().trim() } catch {}
+  console.log("opencode-termux v" + PKG.version + " (binary upstream " + (PKG.opencodeUpstream || "?") + ")")
+  console.log("model aktif : " + model)
+  console.log("zen relay   : " + zen)
+  console.log("bundle      : " + bundle)
+  console.log("storage free: " + disk)
+  return 0
+}
+
+async function cmdModel(id) {
+  if (!id) { console.error("pakai: opencode-termux model <id>   contoh: opencode-termux model big-pickle") ; return 1 }
+  try {
+    const r = await fetch(ZEN + "/models")
+    const j = await r.json()
+    const ids = (j.data || []).map((m) => m.id)
+    if (!ids.includes(id)) {
+      console.error("model tidak ditemukan di relay. tersedia:")
+      ids.forEach((x) => console.log("  " + x))
+      return 1
+    }
+    let c = {}
+    try { c = JSON.parse(fs.readFileSync(OC_CFG, "utf8")) } catch {}
+    c[""] = c[""] || "https://opencode.ai/config.json"
+    c.model = "opencode/" + id
+    fs.writeFileSync(OC_CFG, JSON.stringify(c, null, 2))
+    console.log("✓ model aktif sekarang:", c.model)
+    return 0
+  } catch (e) { console.error("zen tidak terjangkau:", e.message); return 1 }
+}
+
 async function main() {
   const arg = process.argv[2]
   if (arg === "update") return cmdUpdate()
   if (arg === "doctor") return cmdDoctor()
   if (arg === "version") return cmdVersion()
+  if (arg === "models") return cmdModels()
+  if (arg === "status") return cmdStatus()
+  if (arg === "model") return cmdModel(process.argv[3])
   if (arg === "help" || arg === "--help" || arg === "-h") {
     console.log(`opencode-termux v${PKG.version}
 pakai:
