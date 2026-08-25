@@ -57,6 +57,10 @@ jobs:
           echo "tag v$NEWVER didorong + release.yml di-dispatch -> 6 artefak dibangun"
           echo "synced=true" >> "$GITHUB_OUTPUT"
 
+      - name: setup-node untuk auth registry npm (.npmrc)
+        if: steps.sync.outputs.synced == 'true'
+        uses: actions/setup-node@v4
+        with: { node-version: 20, registry-url: "https://registry.npmjs.org" }
       - name: publish npm (kalau NPM_TOKEN dipasang)
         if: steps.sync.outputs.synced == 'true'
         env: { NODE_AUTH_TOKEN: "${{ secrets.NPM_TOKEN }}" }
