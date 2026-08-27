@@ -117,7 +117,7 @@ t("workflow test: punya job e2e arm64 (validasi loader prebuilt)", () => {
   const y = read(".github/workflows/test.yml")
   ok(/e2e-arm64:/.test(y), "job e2e-arm64 hilang")
   ok(/runs-on:\s*ubuntu-24\.04-arm/.test(y), "runner arm64 tidak dipakai")
-  ok(/OCX_ARCH:\s*"?arm64/.test(y), "arsitektur arm64 tidak dipakai")
+  ok(/node:20-alpine/.test(y), "environment musl (Alpine) tidak dipakai")
   ok(/\.\/vendor\/opencode --version/.test(y), "binary arm64 tidak dieksekusi")
 })
 t("workflow release: bangun & unggah 6 artefak otomatis", () => {
