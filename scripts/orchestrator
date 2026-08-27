@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# orchestrator CLI wrapper — jalanin agent orchestrator via opencode
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+CMD="${1:-full}"
+ARGS="${*:2}"
+
+case "$CMD" in
+  full|audit|test|monitor|fix|compact|status|resume)
+    # Jalankan via opencode-termux dengan agent orchestrator
+    exec opencode-termux "/orchestrator $CMD $ARGS"
+    ;;
+  help|--help|-h)
+    cat <<EOF
+orchestrator — Full lifecycle automation
+
+Usage: orchestrator <command> [args...]
+
+Commands:
+  full       Audit → Test → Monitor → Fix → Compact (default)
+  audit      Scan project: structure, deps, security, style, arch
+  test       Run all tests (unit, integration, coverage) per language
+  monitor    Start daemon: file watch, CI status, perf baseline
+  fix        Auto-fix failures from audit/test/monitor (max 5 iter)
+  compact    Optimize: dead code, format, deps, bundle, perf
+  status     Show current orchestrator state
+  resume     Continue from last phase (after crash)
+
+Examples:
+  orchestrator              # Full lifecycle
+  orchestrator audit        # Audit only
+  orchestrator fix          # Fix known failures
+  orchestrator compact      # Optimize codebase
+  orchestrator status       # Show progress
+
+State: .orchestrator-state.json
+Reports: *-report-<timestamp>.md + *-summary.json
+EOF
+    ;;
+  *)
+    echo "Unknown command: $CMD" >&2
+    echo "Run 'orchestrator help' for usage" >&2
+    exit 1
+    ;;
+esac

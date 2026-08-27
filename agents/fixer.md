@@ -1,7 +1,7 @@
 ---
 description: Loop perbaiki otomatis - uji, analisis, perbaiki, ulang sampai hijau
 mode: subagent
-model: opencode/x-preview-f-free
+model: opencode-zen/kimi-k2-5
 tools:
   write: true
   edit: true

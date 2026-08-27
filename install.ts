@@ -11,22 +11,21 @@ import { execFileSync } from "child_process"
 import { Readable } from "stream"
 import { pipeline } from "stream/promises"
 import { fileURLToPath } from "url"
-import { alpinePkg } from "./lib/alpine.mjs"
-import { fetchWithRetry } from "./lib/net.mjs"
-import { expectedFromRegistry, verifySha512 } from "./lib/integrity.mjs"
+import { alpinePkg } from "./lib/alpine.js"
+import { fetchWithRetry } from "./lib/net.js"
+import { expectedFromRegistry, verifySha512, Packument } from "./lib/integrity.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"))
+const pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8")) as { version: string; opencodeUpstream: string }
 const ARCH = process.env.OCX_ARCH || "arm64"
 const FORCE = !!process.env.OCX_FORCE
 const IS_ANDROID = process.platform === "android"
 const T0 = Date.now()
-const log = m => console.log(`[opencode-termux] ${m}`)
+const log = (...args: unknown[]) => console.log("[opencode-termux]", ...args)
 
-// Versi upstream: env > package.json > otomatis ambil terbaru dari registry
 let V = process.env.OCX_UPSTREAM || pkgJson.opencodeUpstream
 if (!V) {
-  const latest = await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json()
+  const latest = await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json() as { version: string }
   V = latest.version
   log(`upstream opencode-ai terbaru: ${V}`)
 }
@@ -37,15 +36,17 @@ if (!IS_ANDROID && !FORCE) {
 
 const A = ARCH === "x64" ? "x86_64" : "aarch64"
 
-async function dl(url, dest) {
+async function dl(url: string, dest: string): Promise<void> {
   log(`download ${url.split("/").pop()}`)
   const res = await fetchWithRetry(fetch, url, {}, 3, m => log(m))
   if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`)
+  if (!res.body) throw new Error("Response body is null")
   await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(dest))
 }
-const untar = (tgz, dest, members = []) => {
+
+const untar = (tgz: string, dest: string, members: string[] = []): void => {
   fs.mkdirSync(dest, { recursive: true })
-  const run = m => execFileSync("tar", ["xzf", tgz, "-C", dest, ...m], { stdio: ["ignore", "ignore", "pipe"] })
+  const run = (m: string[]) => execFileSync("tar", ["xzf", tgz, "-C", dest, ...m], { stdio: ["ignore", "ignore", "pipe"] })
   try { run(members.map(x => "./" + x)) }
   catch { try { run(members) } catch (e) {
     console.error("[opencode-termux] 'tar' tidak ditemukan. Jalankan: pkg install tar")
@@ -57,7 +58,7 @@ const work = path.join(__dirname, ".build")
 fs.rmSync(work, { recursive: true, force: true })
 fs.mkdirSync(work, { recursive: true })
 
-async function fetchLatestAlpineVersion() {
+async function fetchLatestAlpineVersion(): Promise<string> {
   try {
     const res = await fetchWithRetry(fetch, "https://dl-cdn.alpinelinux.org/alpine/latest-stable/", {}, 3)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -68,7 +69,7 @@ async function fetchLatestAlpineVersion() {
   return "v3.21"
 }
 
-async function fetchAlpineReleaseVersion(version) {
+async function fetchAlpineReleaseVersion(version: string): Promise<string> {
   try {
     const res = await fetchWithRetry(fetch, `https://dl-cdn.alpinelinux.org/alpine/${version}/releases/${A}/`, {}, 3)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -84,18 +85,17 @@ try {
   const AL = await fetchAlpineReleaseVersion(AV)
   log(`Alpine version: ${AV} (release ${AL})`)
 
-  // Resolusi dinamis paket Alpine dari CDN (lihat lib/alpine.mjs)
-  const pkg = name => alpinePkg(fetch, `https://dl-cdn.alpinelinux.org/alpine/${AV}/main/${A}`, name)
+  const pkg = (name: string) => alpinePkg(fetch, `https://dl-cdn.alpinelinux.org/alpine/${AV}/main/${A}`, name)
 
-  // 1) binary opencode (musl) dari npm resmi — diverifikasi sha512 registry
   const ocTgz = `opencode-linux-${ARCH}-musl-${V}.tgz`
   await dl(`https://registry.npmjs.org/opencode-linux-${ARCH}-musl/-/${ocTgz}`, `${work}/oc.tgz`)
   log("verifikasi integritas sha512…")
-  const pk = await (await fetchWithRetry(fetch, `https://registry.npmjs.org/opencode-linux-${ARCH}-musl`, {}, 3)).json()
-  verifySha512(`${work}/oc.tgz`, expectedFromRegistry(pk, V))
+  const pk = await (await fetchWithRetry(fetch, `https://registry.npmjs.org/opencode-linux-${ARCH}-musl`, {}, 3)).json() as Packument
+  const integrity = expectedFromRegistry(pk, V)
+  if (!integrity) throw new Error("integrity tidak ditemukan di registry")
+  verifySha512(`${work}/oc.tgz`, integrity)
   untar(`${work}/oc.tgz`, `${work}/oc`)
 
-  // 2) libgcc + libstdc++ (versi terbaru yang tersedia di CDN)
   const apkDir = `${work}/apk`; fs.mkdirSync(apkDir, { recursive: true })
   for (const name of ["libgcc", "libstdc%2B%2B"]) {
     const f = await pkg(name)
@@ -103,12 +103,10 @@ try {
     untar(`${apkDir}/${f}`, apkDir)
   }
 
-  // 3) rakit vendor/
   const vendor = path.join(__dirname, "vendor")
   fs.rmSync(vendor, { recursive: true, force: true }); fs.mkdirSync(vendor)
-  const cp = (dir, name) => fs.copyFileSync(path.join(dir, name), path.join(vendor, name))
+  const cp = (dir: string, name: string) => fs.copyFileSync(path.join(dir, name), path.join(vendor, name))
   if (A === "aarch64") {
-    // loader hasil build khusus: resolv.conf & hosts menunjuk ke prefix Termux
     cp(path.join(__dirname, "prebuilt"), "ld-musl-aarch64-termux.so")
     fs.renameSync(path.join(vendor, "ld-musl-aarch64-termux.so"), path.join(vendor, "ld-musl.so"))
   } else {
@@ -121,8 +119,7 @@ try {
   cp(`${apkDir}/usr/lib`, "libstdc++.so.6"); cp(`${apkDir}/usr/lib`, "libstdc++.so.6.0.33"); cp(`${apkDir}/usr/lib`, "libgcc_s.so.1")
   for (const f of fs.readdirSync(vendor)) fs.chmodSync(path.join(vendor, f), 0o755)
 
-  // 4) siapkan DNS config di prefix Termux (bisa ditulis TANPA root)
-  function ensureEtc() {
+  function ensureEtc(): void {
     try {
       const PREFIX = process.env.TERMUX_PREFIX || "/data/data/com.termux/files/usr"
       const etc = path.join(PREFIX, "etc")
@@ -133,12 +130,12 @@ try {
       if (!fs.existsSync(hh)) fs.writeFileSync(hh, "127.0.0.1 localhost\n")
     } catch (e) {
       if (!FORCE && IS_ANDROID) throw e
-      log("peringatan: setup resolv.conf dilewati (" + e.message.split("\n")[0] + ")")
+      const msg = e instanceof Error ? e.message : String(e)
+      log("peringatan: setup resolv.conf dilewati (" + msg.split("\n")[0] + ")")
     }
   }
   ensureEtc()
 
-  // 5) smoke test (LD_PRELOAD termux-exec dibuang: tidak kompatibel dengan musl)
   if (process.env.OCX_SKIP_SMOKE === "1") {
     log("smoke test dilewati (OCX_SKIP_SMOKE=1 — mode cross-build)")
   } else {
@@ -149,7 +146,6 @@ try {
       { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
   }
 
-  // 6) auto-install agents, commands & config opencode (tanpa menimpa milik user)
   try {
     const HOME = process.env.HOME || "/data/data/com.termux/files/home"
     const OC = path.join(HOME, ".config", "opencode")
@@ -172,10 +168,12 @@ try {
       log("config user sudah ada — tidak disentuh")
     }
   } catch (e) {
-    log("auto-install agent dilewati:", e.message)
+    const msg = e instanceof Error ? e.message : String(e)
+    log("auto-install agent dilewati:", msg)
   }
 } catch (e) {
-  console.error("[opencode-termux] ❌ instalasi gagal:", e.message)
+  const msg = e instanceof Error ? e.message : String(e)
+  console.error("[opencode-termux] ❌ instalasi gagal:", msg)
   process.exitCode = 1
   throw e
 } finally {

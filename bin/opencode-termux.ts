@@ -9,15 +9,14 @@ const root = path.join(__dirname, "..")
 const vendor = path.join(root, "vendor")
 const loader = path.join(vendor, "ld-musl.so")
 const bin = path.join(vendor, "opencode")
-const PKG = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"))
+const PKG = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as { version: string; opencodeUpstream: string }
 const PREFIX = process.env.TERMUX_PREFIX || "/data/data/com.termux/files/usr"
 
-function ready() {
+function ready(): boolean {
   return fs.existsSync(loader) && fs.existsSync(bin)
 }
 
-// Auto-heal: kalau postinstall terlewat (mis. --ignore-scripts), pasang sekarang.
-function heal() {
+function heal(): boolean {
   if (ready()) return true
   console.log("[opencode-termux] vendor belum ada — menjalankan installer…")
   const r = spawnSync(process.execPath, [path.join(root, "install.mjs")], {
@@ -32,9 +31,7 @@ function heal() {
   return true
 }
 
-// DNS fix: musl hasil build kita membaca config dari prefix Termux —
-// pastikan filenya ada (bisa ditulis tanpa root).
-function ensureDns() {
+function ensureDns(): void {
   try {
     const etc = path.join(PREFIX, "etc")
     fs.mkdirSync(etc, { recursive: true })
@@ -45,9 +42,7 @@ function ensureDns() {
   } catch {}
 }
 
-function runBinary(args) {
-  // LD_PRELOAD bawaan Termux (libtermux-exec) dibuat untuk Bionic dan akan
-  // gagal relokasi jika ikut dimuat ke proses musl — jadi selalu dibersihkan.
+function runBinary(args: string[]): number {
   const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
   ensureDns()
   const r = spawnSync(loader, [bin, ...args], {
@@ -58,11 +53,11 @@ function runBinary(args) {
     console.error("[opencode-termux] gagal menjalankan binary:", r.error.message)
     return 1
   }
-  const sigExit = { SIGINT: 130, SIGQUIT: 131, SIGTERM: 143 }
-  return r.status ?? sigExit[r.signal] ?? 1
+  const sigExit: Record<string, number> = { SIGINT: 130, SIGQUIT: 131, SIGTERM: 143 }
+  return r.status ?? sigExit[r.signal ?? ""] ?? 1
 }
 
-async function cmdUpdate() {
+async function cmdUpdate(): Promise<number> {
   console.log(`[opencode-termux] memperbarui bundle (paket v${PKG.version})…`)
   const env = { ...process.env }
   delete env.LD_PRELOAD
@@ -75,9 +70,8 @@ async function cmdUpdate() {
     console.error("[opencode-termux] ❌ update gagal.")
     return 1
   }
-  // sinkronkan pin di package.json modul agar auto-heal berikutnya konsisten
   try {
-    const latest = await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json()
+    const latest = await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json() as { version: string }
     if (latest.version && latest.version !== PKG.opencodeUpstream) {
       PKG.opencodeUpstream = latest.version
       fs.writeFileSync(path.join(root, "package.json"), JSON.stringify(PKG, null, 2) + "\n")
@@ -87,15 +81,15 @@ async function cmdUpdate() {
   return 0
 }
 
-function cmdDoctor() {
+function cmdDoctor(): number {
   let critical = 0
-  const cek = (name, fn, { crit = true } = {}) => {
+  const cek = (name: string, fn: () => string | void, { crit = true } = {}): void => {
     try {
       const info = fn()
       console.log(`✅ ${name}${info ? ` — ${info}` : ""}`)
     } catch (e) {
       if (crit) critical++
-      console.log(`${crit ? "❌" : "⚠️ "} ${name} — ${e.message}`)
+      console.log(`${crit ? "❌" : "⚠️ "} ${name} — ${(e as Error).message}`)
     }
   }
 
@@ -147,7 +141,7 @@ function cmdDoctor() {
   return critical === 0 ? 0 : 1
 }
 
-function cmdVersion() {
+function cmdVersion(): number {
   let binVer = "(belum terpasang)"
   if (ready()) {
     const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
@@ -161,11 +155,11 @@ function cmdVersion() {
   return 0
 }
 
-async function main() {
+async function main(): Promise<void> {
   const arg = process.argv[2]
-  if (arg === "update") return cmdUpdate()
-  if (arg === "doctor") return cmdDoctor()
-  if (arg === "version") return cmdVersion()
+  if (arg === "update") process.exit(await cmdUpdate())
+  if (arg === "doctor") process.exit(cmdDoctor())
+  if (arg === "version") process.exit(cmdVersion())
   if (arg === "help" || arg === "--help" || arg === "-h") {
     console.log(`opencode-termux v${PKG.version}
 pakai:
@@ -173,13 +167,13 @@ pakai:
   opencode-termux update          perbarui binary ke upstream terbaru
   opencode-termux doctor          diagnosis lingkungan & bundle
   opencode-termux version         info versi paket + binary`)
-    return 0
+    process.exit(0)
   }
-  if (!heal()) return 1
-  return runBinary(process.argv.slice(2))
+  if (!heal()) process.exit(1)
+  process.exit(runBinary(process.argv.slice(2)))
 }
 
-main().then(code => process.exit(code)).catch(e => {
+main().catch(e => {
   console.error("[opencode-termux]", e.message)
   process.exit(1)
 })

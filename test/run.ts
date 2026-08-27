@@ -9,26 +9,25 @@ import path from "path"
 import crypto from "crypto"
 import { execFileSync, spawnSync } from "child_process"
 import { fileURLToPath } from "url"
-import { cmpVer, alpinePkg } from "../lib/alpine.mjs"
-import { fetchWithRetry } from "../lib/net.mjs"
-import { expectedFromRegistry, verifySha512 } from "../lib/integrity.mjs"
+import { cmpVer, alpinePkg } from "../lib/alpine.js"
+import { fetchWithRetry } from "../lib/net.js"
+import { expectedFromRegistry, verifySha512 } from "../lib/integrity.js"
 
 const E2E = process.env.OCX_E2E === "1" || process.argv.includes("--e2e")
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..")
 let pass = 0, fail = 0
-const failures = []
-// rantai promise agar test async tetap berurutan & kegagalannya tertangkap
+const failures: { name: string; err: string }[] = []
 let chain = Promise.resolve()
-const t = (name, fn) => {
+const t = (name: string, fn: () => Promise<void> | void) => {
   chain = chain.then(async () => {
     try { await fn(); console.log(`✅ ${name}`); pass++ }
-    catch (e) { console.log(`❌ ${name}\n   └─ ${e.message}`); fail++; failures.push({ name, err: e.message }) }
+    catch (e) { console.log(`❌ ${name}\n   └─ ${(e as Error).message}`); fail++; failures.push({ name, err: (e as Error).message }) }
   })
 }
-const ok = (cond, msg) => { if (!cond) throw new Error(msg) }
-const read = f => fs.readFileSync(path.join(root, f), "utf8")
-const json = f => JSON.parse(read(f))
+const ok = (cond: boolean, msg: string) => { if (!cond) throw new Error(msg) }
+const read = (f: string) => fs.readFileSync(path.join(root, f), "utf8")
+const json = (f: string) => JSON.parse(read(f))
 
 // ===== 1. package.json =====
 t("package.json: JSON valid & field wajib", () => {
@@ -43,10 +42,11 @@ t("package.json: semua entri 'files' ada di disk", () => {
   const files = json("package.json").files
   for (const f of files) ok(fs.existsSync(path.join(root, f)), `"${f}" terdaftar tapi tidak ada`)
 })
-// upstream terbaru dari registry (kalau jaringan tersedia) untuk uji kesegaran pin
-let latestUpstream = null
+let latestUpstream: string | null = null
 try {
-  latestUpstream = (await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json()).version
+  const res = await fetch("https://registry.npmjs.org/opencode-ai/latest")
+  const data = await res.json() as { version: string }
+  latestUpstream = data.version
 } catch {}
 t("package.json: pin upstream == upstream opencode-ai terbaru", () => {
   if (latestUpstream === null) return console.log("   └─ registry tak terjangkau — dilewati")
@@ -55,10 +55,9 @@ t("package.json: pin upstream == upstream opencode-ai terbaru", () => {
 })
 
 // ===== 2. sintaks =====
-for (const f of ["bin/opencode-termux.js", "install.mjs",
-  ...fs.readdirSync(path.join(root, "lib")).map(x => `lib/${x}`)]) {
-  t(`sintaks: ${f}`, () => execFileSync(process.execPath, ["--check", path.join(root, f)], { stdio: "pipe" }))
-}
+t("sintaks: TypeScript (tsc --noEmit)", () => {
+  execFileSync("npx", ["tsc", "--noEmit"], { stdio: "pipe", cwd: root })
+})
 
 // ===== 2b. lisensi & skrip =====
 t("LICENSE: ada dan MIT", () => {
@@ -121,7 +120,7 @@ t("workflow test: punya job e2e arm64 (validasi loader prebuilt)", () => {
   ok(/e2e-arm64:/.test(y), "job e2e-arm64 hilang")
   ok(/linux\/arm64/.test(y), "platform arm64 tidak dipakai")
 })
-t("workflow release: bangun & unggah 9 artefak otomatis", () => {
+t("workflow release: bangun & unggah 4 artefak otomatis", () => {
   const y = read(".github/workflows/release.yml")
   ok(/scripts\/build-all\.sh/.test(y), "build script dipanggil")
   ok(/gh release (create|upload)/.test(y), "unggah ke releases")
@@ -135,7 +134,7 @@ t("skrip rilis: sintaks valid & pola penting ada", () => {
   execFileSync("bash", ["-n", path.join(root, "scripts/build-all.sh")])
   execFileSync("sh", ["-n", path.join(root, "scripts/installer.sh")])
   const b = read("scripts/build-all.sh")
-  for (const need of ["aarch64", "x86_64", "npm pack", "SHA256SUMS.txt", "-eq 9"]) {
+  for (const need of ["aarch64", "npm pack", "SHA256SUMS.txt", "-eq 4"]) {
     ok(b.includes(need), `build-all kurang "${need}"`)
   }
   const i = read("scripts/installer.sh")
@@ -148,8 +147,8 @@ t("prebuilt loader: ELF aarch64 & executable", () => {
   const buf = fs.readFileSync(path.join(root, "prebuilt/ld-musl-aarch64-termux.so"))
   ok(buf.length > 0, "file kosong")
   ok(buf.subarray(0, 4).toString() === "\x7fELF", "bukan ELF")
-  ok(buf[0x12] === 0xb7, `machine bukan aarch64 (0x${buf[0x12].toString(16)})`)
-  ok(fs.statSync(path.join(root, "prebuilt/ld-musl-aarch64-termux.so")).mode & 0o111, "mode tidak executable")
+  ok((buf[0x12] === 0xb7) as boolean, `machine bukan aarch64 (0x${buf[0x12].toString(16)})`)
+  ok((fs.statSync(path.join(root, "prebuilt/ld-musl-aarch64-termux.so")).mode & 0o111) !== 0, "mode tidak executable")
 })
 
 // ===== 7. unit resolver Alpine =====
@@ -179,26 +178,30 @@ t("alpinePkg (integrasi): listing CDN asli bisa diresolve", async () => {
 // ===== 7b. unit retry jaringan =====
 t("fetchWithRetry: sukses setelah gagal sementara", async () => {
   let calls = 0
-  const fetchFn = async () => { calls++; if (calls < 3) throw new Error("down"); return { ok: true } }
+  const mockRes = { ok: true, status: 200, body: null, text: async () => "", json: async <T>() => ({} as T) }
+  const fetchFn = async () => { calls++; if (calls < 3) throw new Error("down"); return mockRes }
   const res = await fetchWithRetry(fetchFn, "https://x", {}, 3)
   ok(res.ok, "hasil tidak ok")
   ok(calls === 3, `panggilan = ${calls}, harus 3`)
 })
 t("fetchWithRetry: 404 gagal permanen tanpa retry", async () => {
   let calls = 0
-  const fetchFn = async () => { calls++; return { ok: false, status: 404 } }
+  const mockRes = { ok: false, status: 404, body: null, text: async () => "", json: async <T>() => ({} as T) }
+  const fetchFn = async () => { calls++; return mockRes }
   await fetchWithRetry(fetchFn, "https://x", {}, 3)
   ok(calls === 1, `harus berhenti di 1 panggilan, dapat ${calls}`)
 })
 t("fetchWithRetry: habis retry melempar error terakhir", async () => {
   const fetchFn = async () => { throw new Error("selalu gagal") }
-  let thrown = null
-  try { await fetchWithRetry(fetchFn, "https://x", {}, 2) } catch (e) { thrown = e }
-  ok(thrown && /selalu gagal/.test(thrown.message), "error tidak dilempar")
+  let thrown: Error | null = null
+  try { await fetchWithRetry(fetchFn, "https://x", {}, 2) } catch (e) { thrown = e as Error }
+  ok(thrown !== null && /selalu gagal/.test(thrown.message), "error tidak dilempar")
 })
 t("fetchWithRetry: 5xx di-retry", async () => {
   let calls = 0
-  const fetchFn = async () => { calls++; return { ok: calls > 1, status: calls > 1 ? 200 : 503 } }
+  const mockRes = { ok: false, status: 503, body: null, text: async () => "", json: async <T>() => ({} as T) }
+  const mockResOk = { ok: true, status: 200, body: null, text: async () => "", json: async <T>() => ({} as T) }
+  const fetchFn = async () => { calls++; return calls > 1 ? mockResOk : mockRes }
   const res = await fetchWithRetry(fetchFn, "https://x", {}, 3)
   ok(res.ok && calls === 2, `503 tidak diretry (calls=${calls})`)
 })
@@ -211,9 +214,9 @@ t("verifySha512: file cocok hash diterima", () => {
     fs.writeFileSync(f, "payload uji")
     const want = crypto.createHash("sha512").update("payload uji").digest("base64")
     ok(verifySha512(f, want), "verifikasi valid salah gagal")
-    let threw = null
-    try { verifySha512(f, Buffer.alloc(64).toString("base64")) } catch (e) { threw = e }
-    ok(threw, "hash salah harus ditolak")
+    let threw: Error | null = null
+    try { verifySha512(f, Buffer.alloc(64).toString("base64")) } catch (e) { threw = e as Error }
+    ok(threw !== null, "hash salah harus ditolak")
   } finally { fs.rmSync(dir, { recursive: true, force: true }) }
 })
 t("expectedFromRegistry: ambil integrity dari packument", () => {
@@ -238,8 +241,8 @@ t("gitignore: mencakup vendor/, .build/, node_modules/, *.tgz, dist/", () => {
 })
 
 // ===== 8b. identitas: semua rata jadi opencode-termux =====
-t("identitas: entrypoint bernama opencode-termux.js (bukan opencode.js)", () => {
-  ok(fs.existsSync(path.join(root, "bin/opencode-termux.js")), "bin/opencode-termux.js hilang")
+t("identitas: entrypoint bernama opencode-termux.ts (bukan opencode.js)", () => {
+  ok(fs.existsSync(path.join(root, "bin/opencode-termux.ts")), "bin/opencode-termux.ts hilang")
   ok(!fs.existsSync(path.join(root, "bin/opencode.js")), "sisa bin/opencode.js masih ada")
   const lock = read("package-lock.json")
   ok(lock.includes('"opencode-termux": "bin/opencode-termux.js"'), "package-lock belum ikut")

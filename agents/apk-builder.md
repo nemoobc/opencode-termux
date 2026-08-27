@@ -1,7 +1,7 @@
 ---
 description: Spesialis build APK Android di Termux — hafal seluruh pipeline
 mode: primary
-model: opencode/x-preview-f-free
+model: opencode-zen/kimi-k2-5
 tools:
   write: true
   edit: true

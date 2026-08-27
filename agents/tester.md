@@ -1,7 +1,7 @@
 ---
 description: Menjalankan seluruh test suite dan menganalisis hasil
 mode: subagent
-model: opencode/x-preview-f-free
+model: opencode-zen/kimi-k2-5
 tools:
   bash: true
 ---
