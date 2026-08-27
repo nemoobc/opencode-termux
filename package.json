@@ -8,8 +8,8 @@
   },
   "scripts": {
     "postinstall": "node install.mjs",
-    "test": "npx tsx test/run.ts",
-    "test:e2e": "npx tsx test/run.ts --e2e",
+    "test": "node test/run.mjs",
+    "test:e2e": "node test/run.mjs --e2e",
     "lint": "echo 'No linter configured'",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
