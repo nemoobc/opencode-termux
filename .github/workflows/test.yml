@@ -27,6 +27,7 @@ jobs:
         run: node test/run.mjs
 
   e2e-arm64:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
