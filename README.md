@@ -61,7 +61,7 @@
 | `/build-apk` | Build APK lengkap lewat agent apk-builder | apk-builder |
 | `/release` | Bump versi → tag → release → bersihkan | apk-builder |
 
-**Config default ikut terpasang:** model gratis `opencode/x-preview-f-free` — **tanpa API key**.
+**Config default ikut terpasang:** model `opencode-zen/kimi-k2-5` (provider zen, OpenAI-compatible) — **tanpa API key**.
 
 ---
 
@@ -204,7 +204,7 @@ mkdir -p ~/project-coba && cd ~/project-coba
 opencode-termux
 ```
 
-**Config default** sudah terpasang otomatis dengan **model gratis `opencode/x-preview-f-free`** — tanpa API key.  
+**Config default** sudah terpasang otomatis dengan **model `opencode-zen/kimi-k2-5`** (provider zen) — **tanpa API key**.  
 Lokasi: `~/.config/opencode/opencode.json` (milik user; installer **tidak pernah menimpa**).
 
 ---
@@ -236,7 +236,6 @@ CI GitHub menjalankan:
 | File | Deskripsi |
 |------|-----------|
 | **[INSTALASI.md](docs/INSTALASI.md)** | Panduan end-to-end: persyaratan → install → verifikasi → update/uninstall → troubleshooting → FAQ |
-| **[CHANGELOG.md](CHANGELOG.md)** | Riwayat perubahan kumulatif semua versi |
 | **[RELEASE-HISTORY.md](RELEASE-HISTORY.md)** | Release notes adaptif semua versi (auto-generated) |
 | **prebuilt/README.md** | Cara rebuild musl loader custom |
 | **Agent & Command** | `agents/*.md` & `commands/*.md` — docs per agent/command |
@@ -278,7 +277,7 @@ ls -la dist/
 |------|-----------|
 | [GitHub Releases](https://github.com/nemoobc/opencode-termux/releases) | **Semua versi** (termasuk lama) + 6 artefak per versi |
 | [npm Versions](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) | History versi npm |
-| [CHANGELOG.md](CHANGELOG.md) | Perubahan per versi |
+| [RELEASE-HISTORY.md](RELEASE-HISTORY.md) | Release notes/riwayat perubahan per versi |
 
 **Skema versi:** `paket.opencodeUpstream.patch` — contoh: `1.20.3` (paket v1.20, upstream opencode-ai 1.18.23, patch 3)
 

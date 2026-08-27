@@ -115,8 +115,8 @@ mkdir -p ~/project-coba && cd ~/project-coba
 opencode-termux
 ```
 
-Config default sudah terpasang otomatis dengan **model gratis
-`opencode/x-preview-f-free`** — tanpa API key. Lokasi config:
+Config default sudah terpasang otomatis dengan **model
+`opencode-zen/kimi-k2-5`** (provider zen) — tanpa API key. Lokasi config:
 `~/.config/opencode/opencode.json` (milik user; installer tidak pernah menimpa).
 
 Bonus ikut terpasang — agent & command siap pakai:
