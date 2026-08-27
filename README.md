@@ -77,7 +77,7 @@ Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) ba
 │  2. Kalau baru: bump opencodeUpstream + version patch       │
 │  3. Anti-bentrok: cek tag GitHub & npm registry             │
 │  4. Commit + tag vX.Y.Z + push                              │
-│  5. Trigger release.yml (build 9 artefak)                   │
+│  5. Trigger release.yml (build 6 artefak)                   │
 │  6. Kalau NPM_TOKEN ada: npm publish otomatis               │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -107,23 +107,22 @@ opencode-termux (Node shim)
 
 ---
 
-## 📦 **Paket Rilis (9 Format — Semua Versi Terpreservasi)**
+## 📦 **Paket Rilis (6 Artefak — Semua Versi Terpreservasi)**
 
-Setiap rilis menghasilkan **9 artefak** yang **tidak hilang** saat versi naik:
+Setiap rilis (via `release.yml` → `scripts/build-release.sh`) menghasilkan **6 artefak**:
 
-| File | Format | Ukuran | Target | Deskripsi |
-|------|--------|--------|--------|-----------|
-| `opencode-termux-{v}.tgz` | `.tgz` | ~200 KB | npm | Package untuk `npm install -g` |
-| `opencode-termux-{v}-aarch64.tar.gz` | `.tar.gz` | ~180 MB | Termux ARM64 | **Offline bundle lengkap** (vendor + source) |
-| `opencode-termux-{v}-x86_64.tar.gz` | `.tar.gz` | ~180 MB | Emulator/x64 | Offline bundle x64 |
-| `opencode-termux-installer-{v}.sh` | `.sh` | ~10 KB | Universal | **POSIX sh installer** (tanpa Node, offline-capable) |
-| `opencode-termux_{v}_aarch64.deb` | `.deb` | ~180 MB | Termux apt | Debian package untuk `pkg install` |
-| `opencode-termux-agents-config-{v}.zip` | `.zip` | ~50 KB | Manual | Agents + commands + config only |
-| `opencode-termux-docs-{v}.zip` | `.zip` | ~200 KB | Offline | **Dokumentasi lengkap** (terpreservasi per versi) |
-| `opencode-termux-{v}-src.tar.gz` | `.tar.gz` | ~500 KB | Audit | Source code untuk transparansi |
-| `SHA256SUMS.txt` / `SHA512SUMS.txt` | `.txt` | - | Verify | Checksum semua file di atas |
+| File | Format | Target | Deskripsi |
+|------|--------|--------|-----------|
+| `nemoobc-opencode-termux-{v}.tgz` | `.tgz` | npm | Package untuk `npm install -g` |
+| `opencode-termux-{v}-aarch64.tar.gz` | `.tar.gz` | Termux ARM64 | **Offline bundle lengkap** (vendor musl + binary + source) |
+| `opencode-termux-{v}-x86_64.tar.gz` | `.tar.gz` | Emulator/x64 | Offline bundle x64 |
+| `opencode-agents-and-config.zip` | `.zip` | Manual | Agents + commands + config saja (bebas versi) |
+| `opencode-termux-installer.sh` | `.sh` | Universal | **POSIX sh installer** (tanpa Node, offline-capable) |
+| `SHA256SUMS.txt` | `.txt` | Verify | Checksum sha256 semua file di atas |
 
-> 💡 **Philosophy:** Semua artefak **versioned** — upgrade ke v1.21.0, file v1.20.3 tetap ada di GitHub Releases & npm registry. **History tidak hilang.**
+> 💡 **Philosophy:** Semua artefak berbundle **versioned** di nama (kecuali
+> `installer.sh` & `agents-and-config.zip` yang deliberately bebas versi agar
+> gampang ditimpa pada update). History tidak hilang — versi lama tetap di GitHub Releases & npm registry.
 
 ---
 
@@ -156,10 +155,26 @@ sha256sum -c SHA256SUMS.txt
 sh opencode-termux-installer.sh
 ```
 
+### **Instalasi Per-Artefak**
+
+Semua file diunduh dari **[GitHub Releases](https://github.com/nemoobc/opencode-termux/releases)** (ganti `{v}` dengan versi, contoh `1.20.3`).
+
+| # | Artefak | Cara Install / Pakai |
+|---|---------|----------------------|
+| 1 | `nemoobc-opencode-termux-{v}.tgz` | Paket npm. `npm install -g ./nemoobc-opencode-termux-{v}.tgz` (atau simpan lalu `npm install -g @nemoobc/opencode-termux`) |
+| 2 | `opencode-termux-{v}-aarch64.tar.gz` | **Bundle offline arm64.** Taruh di folder sama dengan installer lalu `sh opencode-termux-installer.sh` (atau ekstrak manual: `tar xzf opencode-termux-{v}-aarch64.tar.gz -C ~/.local/lib/opencode-termux --strip-components=1`) |
+| 3 | `opencode-termux-{v}-x86_64.tar.gz` | Sama seperti #2, tapi untuk emulator/PC **x64**. Bisa dijalankan manual: `./vendor/ld-musl.so ./vendor/opencode --version` |
+| 4 | `opencode-agents-and-config.zip` | **Agent + command + config saja.** Ekstrak ke `~/.config/opencode/`: `unzip opencode-agents-and-config.zip -d ~/.config/opencode` (tidak menimpa `opencode.json` yang sudah ada) |
+| 5 | `opencode-termux-installer.sh` | **Installer universal.** `sh opencode-termux-installer.sh`. Baca bundle `-{arch}.tar.gz` di folder yang sama (offline) atau unduh otomatis dari Releases (online). Target instalasi: Termux → `$PREFIX/{lib,bin}`, selain itu → `~/.local/{lib,bin}` |
+| 6 | `SHA256SUMS.txt` | **Verifikasi.** Sebelum install, cek keutuhan: `sha256sum -c SHA256SUMS.txt` (jalankan di folder berisi semua file artefak) |
+
+> **Selalu verifikasi dulu:** `sha256sum -c SHA256SUMS.txt` sebelum mengekstrak/menjalankan artefak apa pun yang diunduh.
+
 ### **Via .deb (Termux apt)**
 ```bash
 pkg install ./opencode-termux_{v}_aarch64.deb
 ```
+> ⚠️ Artefak `.deb` dihapus pada rilis v1.20.3 — paket kini fokus **npm + installer.sh + bundle tarball**. Kalau kamu butuh `.deb`, arahkan ke rilis lama.
 
 ---
 
@@ -203,7 +218,7 @@ npm run test:e2e      # E2E penuh: install bundle + smoke test + subcommand
 
 CI GitHub menjalankan:
 - Struktur test di setiap push
-- **E2E ARM64 sungguhan** (emulasi QEMU — loader musl prebuilt Termux benar-benar dieksekusi)
+- **E2E ARM64 sungguhan** (native di runner `ubuntu-24.04-arm` via container Alpine — loader musl prebuilt Termux benar-benar dieksekusi)
 
 ---
 
@@ -236,8 +251,8 @@ git clone https://github.com/nemoobc/opencode-termux.git
 cd opencode-termux
 npm install
 
-# Build semua artefak rilis (9 format)
-./scripts/build-all.sh
+# Build semua artefak rilis (6 format)
+./scripts/build-release.sh
 
 # Output di ./dist/
 ls -la dist/
@@ -251,7 +266,7 @@ ls -la dist/
 | `npm run test:e2e` | E2E test penuh |
 | `npm run typecheck` | TypeScript type check |
 | `npm run lint` | Lint placeholder |
-| `./scripts/build-all.sh` | Build 9 artefak rilis |
+| `./scripts/build-release.sh` | Build 6 artefak rilis |
 | `./scripts/generate-release-notes.sh` | Generate release notes adaptive |
 | `./scripts/build-install-guide.sh` | Generate panduan instalasi lengkap |
 
@@ -261,7 +276,7 @@ ls -la dist/
 
 | Link | Deskripsi |
 |------|-----------|
-| [GitHub Releases](https://github.com/nemoobc/opencode-termux/releases) | **Semua versi** (termasuk lama) + 9 artefak per versi |
+| [GitHub Releases](https://github.com/nemoobc/opencode-termux/releases) | **Semua versi** (termasuk lama) + 6 artefak per versi |
 | [npm Versions](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) | History versi npm |
 | [CHANGELOG.md](CHANGELOG.md) | Perubahan per versi |
 

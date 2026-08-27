@@ -64,6 +64,33 @@ Untuk HP yang kesulitan `npm` (atau menyiapkan paket di PC lalu dipindahkan):
 Installer mendeteksi bundle offline di sebelahnya otomatis — tanpa internet,
 tanpa Node.js, checksum sha256 ikut terverifikasi via `SHA256SUMS.txt`.
 
+### **Instalasi per-artefak (dari GitHub Releases)**
+
+Semua file diunduh dari
+**[Releases](https://github.com/nemoobc/opencode-termux/releases)**. Ganti `{v}`
+dengan versi (contoh `1.20.3`), dan `-aarch64` dengan `-x86_64` kalau kamu di
+emulator/PC. **Verifikasi dulu sebelum dipakai:** `sha256sum -c SHA256SUMS.txt`.
+
+| # | Artefak | Cara install / pakai |
+|---|---------|----------------------|
+| 1 | `nemoobc-opencode-termux-{v}.tgz` | Paket npm. `npm install -g ./nemoobc-opencode-termux-{v}.tgz` |
+| 2 | `opencode-termux-{v}-aarch64.tar.gz` | **Bundle offline arm64.** Taruh di folder yang sama dengan installer lalu `sh opencode-termux-installer.sh`. (Manual: `tar xzf ... -C ~/.local/lib/opencode-termux --strip-components=1`) |
+| 3 | `opencode-termux-{v}-x86_64.tar.gz` | Bundle offline untuk emulator/PC x64. Sama seperti #2. |
+| 4 | `opencode-agents-and-config.zip` | Agent + command + config saja. `unzip opencode-agents-and-config.zip -d ~/.config/opencode` (tidak menimpa `opencode.json` yang sudah ada). |
+| 5 | `opencode-termux-installer.sh` | **Installer universal.** `sh opencode-termux-installer.sh`. Di Termux memasang ke `$PREFIX/lib/opencode-termux` + `$PREFIX/bin`; di luar Termux ke `~/.local/{lib,bin}`. Bisa offline (bundle di sampingnya) atau online (unduh otomatis). |
+| 6 | `SHA256SUMS.txt` | Verifikasi keutuhan semua artefak: `sha256sum -c SHA256SUMS.txt`. |
+
+Contoh verifikasi lengkap lalu install offline:
+
+```bash
+# taruh ketiga file di satu folder, lalu:
+sha256sum -c SHA256SUMS.txt          # semua harus 'OK'
+sh opencode-termux-installer.sh       # pakai bundle -aarch64 di sampingnya
+```
+
+> ⚠️ Artefak `.deb` dihapus sejak v1.20.3 (paket fokus npm + installer.sh +
+> bundle tarball). Butuh `.deb`? Ambil dari rilis lama.
+
 ## 4️⃣ Verifikasi
 
 ```bash
