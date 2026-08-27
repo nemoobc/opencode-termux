@@ -55,19 +55,7 @@ t("package.json: pin upstream == upstream opencode-ai terbaru", () => {
 })
 
 // ===== 2. sintaks =====
-for (const f of [
-       "bin/opencode-termux.js",
-       "install.mjs",
-       ...fs.readdirSync(path.join(root, "lib"))
-         .map(x => `lib/${x}`)
-         .filter(x => x.endsWith(".mjs") || x.
-     endsWith(".js"))
-     ]) {
-       t(`sintaks: ${f}`, () => execFileSync(
-         process.execPath, ["--check", path.join(
-     root, f)],
-         { stdio: "pipe" }))
-}
+for (const f of [ "bin/opencode-termux.js", "install.mjs", ...fs.readdirSync(path.join(root, "lib")) .map(x => lib/${x}) .filter(x => x.endsWith(".mjs") || x.endsWith(".js")) ]) { t(sintaks: ${f}, () => execFileSync( process.execPath, ["--check", path.join(root, f)], { stdio: "pipe" })) }
 
 // ===== 2b. lisensi & skrip =====
 t("LICENSE: ada dan MIT", () => {
