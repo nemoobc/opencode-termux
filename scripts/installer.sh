@@ -38,7 +38,10 @@ fi
 # ---- sumber bundle: offline dulu, online kemudian -----------------------
 HERE=$(cd "$(dirname "$0")" 2>/dev/null && pwd || pwd)
 LOCAL_BUNDLE="$HERE/opencode-termux-$VERSION-$ARCH.tar.gz"
-WORK="${TMPDIR:-/tmp}/ocx-install-$$"
+# direktori sementara ramah-Termux (Termux tak punya /tmp bawaan)
+PREF_TMP="${TMPDIR:-${PREFIX:-/data/data/com.termux/files/usr}/tmp}"
+mkdir -p "$PREF_TMP" 2>/dev/null || PREF_TMP="$(pwd)/.ocx-tmp"
+WORK="$PREF_TMP/ocx-install-$$"
 mkdir -p "$WORK"
 
 fetch() { # fetch <url> <dest>
@@ -62,6 +65,8 @@ mkdir -p "$LIBDIR" "$BINDIR"
 tar xzf "$WORK/bundle.tar.gz" -C "$LIBDIR" --strip-components=1
 
 # wrapper CLI (sh murni, tanpa node)
+# rm -f dulu agar ikut menimpa symlink npm lama (bukan menulis ke target-nya)
+rm -f "$BINDIR/opencode-termux"
 { printf '#!/bin/sh\n'
   printf 'LD_LIBRARY_PATH="%s/vendor" exec "%s/vendor/ld-musl.so" "%s/vendor/opencode" "$@"\n' \
     "$LIBDIR" "$LIBDIR" "$LIBDIR"
@@ -75,13 +80,13 @@ if [ "$IS_TERMUX" = 1 ]; then
   [ -f "$PREFIX/etc/hosts" ] || printf '127.0.0.1 localhost\n' > "$PREFIX/etc/hosts" 2>/dev/null || true
 fi
 
-rm -rf "$WORK"
-
 # ---- smoke test ----------------------------------------------------------
-if "$BINDIR/opencode-termux" --version >/tmp/ocx-ver.$$ 2>&1; then
+if "$BINDIR/opencode-termux" --version >"$WORK/ocx-ver.$$" 2>&1; then
   say "✅ terpasang: $($BINDIR/opencode-termux --version)"
   say "jalankan: opencode-termux"
 else
-  cat /tmp/ocx-ver.$$ >&2 || true; rm -f /tmp/ocx-ver.$$
+  cat "$WORK/ocx-ver.$$" >&2 || true
   die "smoke test gagal — pastikan arsitektur didukung lalu coba lagi"
 fi
+
+rm -rf "$WORK"
