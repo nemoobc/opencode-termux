@@ -67,7 +67,7 @@ for (const f of [
          process.execPath, ["--check", path.join(
      root, f)],
          { stdio: "pipe" }))
-    }
+}
 
 // ===== 2b. lisensi & skrip =====
 t("LICENSE: ada dan MIT", () => {
