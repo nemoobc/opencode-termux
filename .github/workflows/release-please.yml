@@ -1,8 +1,9 @@
 name: release-please
 
+# Dinonaktifkan otomatis (hanya manual) untuk mencegah bentrok dua mekanisme
+# bump versi dengan sync-upstream.yml. Kontrol rilis kini dipegang sync-upstream.
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
