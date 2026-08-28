@@ -17,15 +17,6 @@ jobs:
         with: { node-version: 20 }
       - name: rakit 6 artefak
         run: bash scripts/build-release.sh dist
-      - name: publish ke npm registry
-        env: { NPM_TOKEN: "${{ secrets.NPM_TOKEN }}" }
-        run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "::warning::NPM_TOKEN secret kosong, lewati publish npm"
-            exit 0
-          fi
-          npm config set "//registry.npmjs.org/:_authToken" "$NPM_TOKEN"
-          npm publish --access public --ignore-scripts
       - name: unggah ke GitHub Releases
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
