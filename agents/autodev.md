@@ -297,6 +297,7 @@ bats test/ 2>&1 | tee test-shell.log  # kalau ada test/*.bats
 6. **Laporan wajib** — setiap tahap output ke file `autodev-<tahap>-<timestamp>.md`
 7. **Bahasa Indonesia** — laporan & log bahasa Indonesia, singkat padat
 8. **State persistence** — simpan ke `.autodev-state.json` (resumeable)
+9. **JANGAN PERNAH menulis raw tool-call XML sebagai teks** — dilarang keras menampilkan/menulis tag literal seperti `<parameter>`, `<parameter name="...">`, `</parameter>`, `<invoke>`, `<function_calls>`, `<antml:...>`, dsb. di pesan, laporan, atau log. Selalu panggil tool beneran; kalau ada pemicu, pakai deskripsi teks biasa (misal "parameter x=..., y=..."), JANGAN tag mentah. Ini mencegah bug renderer yang menampilkan tag literal di TUI.
 
 ---
 
