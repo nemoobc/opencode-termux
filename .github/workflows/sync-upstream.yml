@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   actions: write
+  packages: write
 
 jobs:
   sync:
@@ -67,3 +68,10 @@ jobs:
         run: |
           if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN belum dipasang — skip publish"; exit 0; fi
           npm publish --access public || echo "publish gagal — cek manual"
+      - name: publish ke GitHub Packages
+        if: steps.sync.outputs.synced == 'true'
+        env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=$GH_TOKEN" > .npmrc
+          echo "@nemoobc:registry=https://npm.pkg.github.com" >> .npmrc
+          npm publish --access public || echo "publish GH Packages gagal — cek manual"
