@@ -163,9 +163,9 @@ function cmdVersion() {
 
 async function main() {
   const arg = process.argv[2]
-  if (arg === "update") return cmdUpdate()
-  if (arg === "doctor") return cmdDoctor()
-  if (arg === "version") return cmdVersion()
+  if (arg === "update") process.exit(await cmdUpdate())
+  if (arg === "doctor") process.exit(cmdDoctor())
+  if (arg === "version") process.exit(cmdVersion())
   if (arg === "help" || arg === "--help" || arg === "-h") {
     console.log(`opencode-termux v${PKG.version}
 pakai:
@@ -173,13 +173,13 @@ pakai:
   opencode-termux update          perbarui binary ke upstream terbaru
   opencode-termux doctor          diagnosis lingkungan & bundle
   opencode-termux version         info versi paket + binary`)
-    return 0
+    process.exit(0)
   }
-  if (!heal()) return 1
-  return runBinary(process.argv.slice(2))
+  if (!heal()) process.exit(1)
+  process.exit(runBinary(process.argv.slice(2)))
 }
 
-main().then(code => process.exit(code)).catch(e => {
+main().catch(e => {
   console.error("[opencode-termux]", e.message)
   process.exit(1)
 })
