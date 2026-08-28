@@ -281,6 +281,19 @@ ls -la dist/
 
 **Skema versi:** `paket.opencodeUpstream.patch` — contoh: `1.20.3` (paket v1.20, upstream opencode-ai 1.18.23, patch 3)
 
+### 🔄 Alur Rilis Otomatis (kendali tunggal: `sync-upstream`)
+
+Satu-satunya mekanisme yang menaikkan versi & menerbitkan rilis adalah workflow **`sync-upstream`** (otomatis tiap 6 jam + bisa manual via `workflow_dispatch`):
+
+1. Cek versi terbaru **`opencode-ai`** di npm.
+2. Berbeda dari `opencodeUpstream`? → naikkan `opencodeUpstream` + versi paket, commit + tag `vX.Y.Z`.
+3. **Publish ke npm** `@nemoobc/opencode-termux`.
+4. Dispatch workflow **`release`** → build 6 artefak + unggah ke GitHub Releases.
+
+Rilis manual (mis. commit fitur/perbaikan): naikkan versi di `package.json` → tag `vX.Y.Z` → push tag → workflow `release` otomatis build + GitHub release.
+
+> **Catatan:** `release-please` sengaja dinonaktifkan otomatis (hanya `workflow_dispatch`) untuk menghindari dua mekanisme bump versi yang bisa bentrok. Publish npm **tidak** dilakukan di workflow `release` — itu tugas `sync-upstream`, agar versi tidak ter-publish dua kali (double-publish).
+
 ---
 
 ## 🤝 **Kontribusi**
