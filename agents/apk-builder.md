@@ -1,7 +1,7 @@
 ---
 description: Spesialis build APK Android di Termux — hafal seluruh pipeline
 mode: primary
-model: opencode-zen/kimi-k2-5
+model: opencode/big-pickle
 tools:
   write: true
   edit: true
@@ -27,7 +27,7 @@ RAKIT PAYLOAD (assets/payload/rootfs.bin):
 - libs (libgcc_s.so.1, libstdc++.so.6) → rootfs/usr/lib/
 - rootfs/etc/resolv.conf: nameserver 1.1.1.1 + 8.8.8.8
 - rootfs/usr/bin/oc: wrapper exec /usr/bin/opencode (chmod +x)
-- rootfs/root/.config/opencode/opencode.json: model opencode/x-preview-f-free
+- rootfs/root/.config/opencode/opencode.json: model opencode/big-pickle
 - tar -czf assets/payload/rootfs.bin -C staging/rootfs .
 
 BUILD:

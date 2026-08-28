@@ -1,7 +1,7 @@
 ---
 description: Ahli coding di Termux/Android — paham PATH, pkg, dan lingkungan mobile
 mode: primary
-model: opencode-zen/kimi-k2-5
+model: opencode/big-pickle
 tools:
   write: true
   edit: true

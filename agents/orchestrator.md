@@ -1,7 +1,7 @@
 ---
 description: Orchestrator — coordinates audit, test, monitor, fix, compact in sequence
 mode: primary
-model: opencode-zen/kimi-k2-5
+model: opencode/big-pickle
 tools:
   bash: true
   read: true

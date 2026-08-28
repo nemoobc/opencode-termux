@@ -1,7 +1,7 @@
 ---
 description: AUTODEV — Developer otonom universal multi-bahasa: audit, test, monitor, fix, compact dalam satu agent
 mode: primary
-model: opencode-zen/kimi-k2-5
+model: opencode/big-pickle
 tools:
   write: true
   edit: true

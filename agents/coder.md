@@ -1,7 +1,7 @@
 ---
 description: Master coder — multi-language, full lifecycle: audit, test, monitor, fix, compact
 mode: primary
-model: opencode-zen/kimi-k2-5
+model: opencode/big-pickle
 tools:
   write: true
   edit: true

@@ -1,7 +1,7 @@
 ---
 description: Menjalankan seluruh test suite dan menganalisis hasil
 mode: subagent
-model: opencode-zen/kimi-k2-5
+model: opencode/big-pickle
 tools:
   bash: true
 ---
@@ -17,7 +17,7 @@ TEST MESIN (server opencode di 127.0.0.1:4096, app harus terbuka):
 1. curl -s http://127.0.0.1:4096/ → 200 = server hidup
 2. Buat sesi: POST /session {"title":"tes"}
 3. Kirim: POST /session/{id}/message {"parts":[{"type":"text","text":"..."}],
-   "model":{"providerID":"opencode","modelID":"x-preview-f-free"}}
+   "model":{"providerID":"opencode","modelID":"big-pickle"}}
 4. Verifikasi: respons JSON berisi parts dengan teks jawaban
 5. Abort: POST /session/{id}/abort → 200
 
