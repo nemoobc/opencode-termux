@@ -20,11 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 20 }
-      - name: e2e penuh x64 (unduh bundle + smoke test + subcommand)
-        env: { OCX_E2E: "1" }
-        run: node test/run.mjs
+      - name: e2e penuh x64 (host musl alpine x64 via docker — medan sama dengan arm64)
+        run: |
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD":/w -w /w \
+            -e OCX_E2E=1 -e HOME=/tmp \
+            node:20-alpine \
+            sh -c "apk add --no-cache tar >/dev/null 2>&1; node test/run.mjs"
 
   e2e-arm64:
     runs-on: ubuntu-24.04-arm
