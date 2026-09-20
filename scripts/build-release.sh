@@ -4,7 +4,7 @@
 #   2. opencode-termux-<v>-aarch64.tar.gz      — bundle offline arm64
 #   3. opencode-termux-<v>-x86_64.tar.gz       — bundle offline x64
 #   4. nemoobc-opencode-termux-<v>.tgz         — paket npm
-#   5. opencode-agents-and-config.zip          — paket agent/command/config
+#   5. opencode-config.zip                     — paket config
 #   6. SHA256SUMS.txt                          — checksum semua di atas
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,7 +20,7 @@ for ARCH in arm64 x64; do
   OCX_ARCH="$ARCH" OCX_FORCE=1 OCX_SKIP_SMOKE=1 node install.mjs >/dev/null
   tar czf "$OUT/opencode-termux-$VER-$NAME.tar.gz" \
     --transform "s|^|opencode-termux/|" \
-    bin lib vendor agents commands config LICENSE README.md
+    bin lib vendor config LICENSE README.md
 done
 # pastikan vendor kembali ke arsitektur mesin ini untuk pemakaian lokal
 HOST_ARCH=$(node -p "process.arch === 'arm64' ? 'arm64' : 'x64'")
@@ -29,8 +29,8 @@ OCX_ARCH="$HOST_ARCH" OCX_FORCE=1 node install.mjs >/dev/null
 echo "== paket npm =="
 npm pack --pack-destination "$OUT" >/dev/null
 
-echo "== paket agent+command+config =="
-zip -qr "$OUT/opencode-agents-and-config.zip" agents commands config
+echo "== paket config =="
+zip -qr "$OUT/opencode-config.zip" config
 
 echo "== installer universal =="
 sed "s/@VERSION@/$VER/" scripts/installer.sh > "$OUT/opencode-termux-installer.sh"

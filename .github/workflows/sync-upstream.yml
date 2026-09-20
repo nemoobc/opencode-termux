@@ -21,7 +21,7 @@ jobs:
         name: cek & sesuaikan versi upstream
         env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
-          UP=$(curl -sf https://registry.npmjs.org/opencode-ai/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
+          UP=$(curl -sf https://registry.npmjs.org/@opencode%2Fcli/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['version'])")
           CUR=$(python3 -c "import json; print(json.load(open('package.json')).get('opencodeUpstream',''))")
           echo "upstream=$UP | current=$CUR"
           if [ "$UP" = "$CUR" ]; then
@@ -48,7 +48,7 @@ jobs:
           git config user.name "nemoobc"
           git config user.email "258114617+nemoobc@users.noreply.github.com"
           git add package.json
-          git commit -m "sync: upstream opencode-ai $UP"
+          git commit -m "sync: upstream opencode $UP"
           git tag "v$NEWVER"
           git push
           git push origin "v$NEWVER"

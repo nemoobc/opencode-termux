@@ -34,7 +34,7 @@ const json = f => JSON.parse(read(f))
 t("package.json: JSON valid & field wajib", () => {
   const p = json("package.json")
   ok(p.name === "@nemoobc/opencode-termux", "nama paket salah")
-  ok(/^\d+\.\d+\.\d+$/.test(p.version), `versi tidak semver: ${p.version}`)
+  ok(/^\d+\.\d+\.\d+(\.\d+)?$/.test(p.version), `versi tidak semver: ${p.version}`)
   ok(p.bin && p.bin["opencode-termux"] === "./bin/opencode-termux.js", "bin salah")
   ok(typeof p.opencodeUpstream === "string" && /^\d+\.\d+\.\d+$/.test(p.opencodeUpstream), "opencodeUpstream tidak semver")
   ok(p.scripts && typeof p.scripts.test === "string", "script test hilang")
@@ -44,14 +44,17 @@ t("package.json: semua entri 'files' ada di disk", () => {
   for (const f of files) ok(fs.existsSync(path.join(root, f)), `"${f}" terdaftar tapi tidak ada`)
 })
 // upstream terbaru dari registry (kalau jaringan tersedia) untuk uji kesegaran pin
-let latestUpstream = null
-try {
-  latestUpstream = (await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json()).version
-} catch {}
-t("package.json: pin upstream == upstream opencode-ai terbaru", () => {
-  if (latestUpstream === null) return console.log("   └─ registry tak terjangkau — dilewati")
-  ok(json("package.json").opencodeUpstream === latestUpstream,
-    `pin ${json("package.json").opencodeUpstream} ≠ upstream ${latestUpstream}`)
+t("package.json: pin upstream valid (URL binary tersedia)", async () => {
+  const pin = json("package.json").opencodeUpstream
+  ok(/^\d+\.\d+\.\d+$/.test(pin), `pin tidak semver: ${pin}`)
+  if (pin.startsWith("2.")) {
+    // v2 tidak ada di npm registry — cek ketersediaan di opencode.ai
+    const res = await fetch(`https://opencode.ai/files/bin/${pin}/opencode-linux-arm64-musl.tar.gz`, { method: "HEAD" })
+    ok(res.ok, `URL opencode.ai ${pin} tidak tersedia (HTTP ${res.status})`)
+  } else {
+    const pk = await (await fetch("https://registry.npmjs.org/opencode-linux-arm64-musl")).json()
+    ok(!!pk.versions?.[pin], `versi ${pin} tidak ada di registry npm`)
+  }
 })
 
 // ===== 2. sintaks =====
@@ -71,26 +74,6 @@ t("docs: panduan instalasi ada & tertaut dari README", () => {
   ok(/Troubleshooting|troubleshooting/.test(g), "bagian troubleshooting hilang")
   ok(/FAQ/.test(g), "bagian FAQ hilang")
   ok(read("README.md").includes("docs/INSTALASI.md"), "README tidak menautkan panduan")
-})
-
-// ===== 3. agents & commands frontmatter =====
-t("agents: setiap file punya frontmatter description+mode+model", () => {
-  for (const f of fs.readdirSync(path.join(root, "agents"))) {
-    const c = read(`agents/${f}`)
-    ok(c.startsWith("---"), `${f}: tanpa frontmatter`)
-    ok(/^description:/m.test(c), `${f}: tanpa description`)
-    ok(/^mode: (primary|subagent|all)/m.test(c), `${f}: mode tidak valid`)
-    ok(/^model: \S+/m.test(c), `${f}: tanpa model`)
-    ok(!/\bTODO\b/.test(c), `${f}: mengandung TODO`)
-  }
-})
-t("commands: setiap file punya description & $ARGUMENTS", () => {
-  for (const f of fs.readdirSync(path.join(root, "commands"))) {
-    const c = read(`commands/${f}`)
-    ok(c.startsWith("---"), `${f}: tanpa frontmatter`)
-    ok(/^description:/m.test(c), `${f}: tanpa description`)
-    ok(/\$ARGUMENTS/.test(c), `${f}: tanpa $ARGUMENTS`)
-  }
 })
 
 // ===== 4. config =====
@@ -246,11 +229,13 @@ t("identitas: entrypoint bernama opencode-termux.js (bukan opencode.js)", () => 
 
 // ===== 9. E2E opsional (--e2e atau OCX_E2E=1) =====
 if (E2E) {
-  console.log("\n🔧 mode E2E: instalasi bundle x64 + smoke test + subcommand…")
-  t("e2e: install.mjs selesai tanpa error (OCX_ARCH=x64 OCX_FORCE=1)", () => {
+  // arsitektur e2e: default x64 (CI ubuntu), override OCX_ARCH untuk host arm64
+  const E2E_ARCH = process.env.OCX_ARCH || "x64"
+  console.log(`\n🔧 mode E2E: instalasi bundle ${E2E_ARCH} + smoke test + subcommand…`)
+  t(`e2e: install.mjs selesai tanpa error (OCX_ARCH=${E2E_ARCH} OCX_FORCE=1)`, () => {
     execFileSync(process.execPath, [path.join(root, "install.mjs")], {
       stdio: "inherit",
-      env: { ...process.env, OCX_ARCH: "x64", OCX_FORCE: "1" },
+      env: { ...process.env, OCX_ARCH: E2E_ARCH, OCX_FORCE: "1" },
       cwd: root,
     })
   })
@@ -266,7 +251,7 @@ if (E2E) {
       encoding: "utf8", env: process.env, cwd: root,
     })
     ok(out.includes(`v${json("package.json").version}`), "versi paket tidak tercetak")
-    ok(/binary \d+\.\d+\.\d+/.test(out), "versi binary tidak tercetak")
+    ok(/binary opencode v\d+\.\d+\.\d+/.test(out), "versi binary tidak tercetak")
     console.log(`   └─ ${out.trim()}`)
   })
   t("e2e: subcommand doctor sehat (exit 0)", () => {

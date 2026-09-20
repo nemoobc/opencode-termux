@@ -12,7 +12,7 @@ cat > "/tmp/install-guide-${VER}.md" <<'GUIDEEOF'
 # 📥 Panduan Instalasi Lengkap — opencode-termux v{{VER}}
 
 **Versi Paket:** {{VER}}  
-**Upstream opencode-ai:** v{{UPSTREAM}}  
+**Upstream opencode:** v{{UPSTREAM}}  
 **Platform:** Android 9+ ARM64 (Termux F-Droid/GitHub build)  
 **Lisensi:** MIT  
 
@@ -141,7 +141,7 @@ pkg install ./opencode-termux_{{VER}}_aarch64.deb
 ### Cek Versi
 ```bash
 opencode-termux --version
-# Output: 1.18.23 (binary upstream version)
+# Output: 2.0.6 (binary upstream version)
 ```
 
 ### Doctor (Diagnosis Lengkap)
@@ -276,7 +276,7 @@ Semua file tersedia di [GitHub Releases v{{VER}}](https://github.com/nemoobc/ope
 | opencode-termux-{{VER}}-x86_64.tar.gz | `sha256sum` | ~180 MB | Offline bundle x64 |
 | opencode-termux-installer-{{VER}}.sh | `sha256sum` | ~10 KB | Universal installer (POSIX sh) |
 | opencode-termux_{{VER}}_aarch64.deb | `sha256sum` | ~180 MB | Debian package untuk Termux |
-| opencode-termux-agents-config-{{VER}}.zip | `sha256sum` | ~50 KB | Agents + commands + config |
+| opencode-config-{{VER}}.zip | `sha256sum` | ~1 KB | Config default |
 | opencode-termux-docs-{{VER}}.zip | `sha256sum` | ~200 KB | Dokumentasi lengkap (offline) |
 | opencode-termux-{{VER}}-src.tar.gz | `sha256sum` | ~500 KB | Source code (audit/transparansi) |
 | SHA256SUMS.txt | - | - | Semua checksum SHA256 |

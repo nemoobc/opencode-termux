@@ -14,7 +14,7 @@ UPSTREAM=$(node -p "require('./package.json').opencodeUpstream")
 OUT="${1:-dist}"
 DATE=$(date -u +"%Y-%m-%d")
 
-echo "=== Building opencode-termux v$VER (upstream opencode-ai v$UPSTREAM) ==="
+echo "=== Building opencode-termux v$VER (upstream opencode v$UPSTREAM) ==="
 rm -rf "$OUT"; mkdir -p "$OUT"
 
 # ============================================================
@@ -31,7 +31,7 @@ echo "== 2/4: Building offline bundle ARM64 =="
 OCX_ARCH=arm64 OCX_FORCE=1 OCX_SKIP_SMOKE=1 node install.mjs >/dev/null
 tar czf "$OUT/opencode-termux-$VER-aarch64.tar.gz" \
   --transform "s|^|opencode-termux/|" \
-  bin lib vendor agents commands config LICENSE README.md docs
+  bin lib vendor config LICENSE README.md docs
 
 # Restore host arch vendor for local use
 HOST_ARCH=$(node -p "process.arch === 'arm64' ? 'arm64' : 'x64'")
@@ -62,8 +62,12 @@ cp -r vendor/* "$DEB_DIR/data/data/com.termux/files/usr/lib/opencode-termux/"
 
 cat > "$DEB_DIR/data/data/com.termux/files/usr/bin/opencode-termux" <<'EOF'
 #!/data/data/com.termux/files/usr/bin/sh
+# Binary sudah dipatch PT_INTERP → ld-musl (vendor), jadi eksekusi langsung.
 LIBDIR="/data/data/com.termux/files/usr/lib/opencode-termux"
-LD_LIBRARY_PATH="$LIBDIR/vendor" exec "$LIBDIR/vendor/ld-musl.so" "$LIBDIR/vendor/opencode" "$@"
+export LD_PRELOAD=
+export TMPDIR="${TMPDIR:-$LIBDIR/tmp}"
+mkdir -p "$TMPDIR"
+exec "$LIBDIR/vendor/opencode" "$@"
 EOF
 chmod +x "$DEB_DIR/data/data/com.termux/files/usr/bin/opencode-termux"
 
@@ -74,7 +78,7 @@ Architecture: aarch64
 Maintainer: nemoobc <258114617+nemoobc@users.noreply.github.com>
 Depends: nodejs-lts (>= 18), tar
 Description: opencode CLI native untuk Termux/Android tanpa proot
- Membundel loader musl + binary opencode resmi (upstream opencode-ai v$UPSTREAM).
+ Membundel loader musl + binary opencode resmi (upstream opencode v$UPSTREAM).
  Termasuk agent autodev, termux-coder, apk-builder, tester, fixer
  dan command /test, /fix, /build-apk, /release, /coder, /orchestrator.
 Homepage: https://github.com/nemoobc/opencode-termux
@@ -89,11 +93,7 @@ mkdir -p "$PREFIX/etc"
 [ -f "$PREFIX/etc/hosts" ] || printf '127.0.0.1 localhost\n' > "$PREFIX/etc/hosts"
 HOME_DIR="${HOME:-/data/data/com.termux/files/home}"
 OC_DIR="$HOME_DIR/.config/opencode"
-mkdir -p "$OC_DIR/agent" "$OC_DIR/command"
-[ -d /data/data/com.termux/files/usr/lib/opencode-termux/agents ] && \
-  cp -n /data/data/com.termux/files/usr/lib/opencode-termux/agents/* "$OC_DIR/agent/" 2>/dev/null || true
-[ -d /data/data/com.termux/files/usr/lib/opencode-termux/commands ] && \
-  cp -n /data/data/com.termux/files/usr/lib/opencode-termux/commands/* "$OC_DIR/command/" 2>/dev/null || true
+mkdir -p "$OC_DIR"
 [ -f /data/data/com.termux/files/usr/lib/opencode-termux/config/opencode.json ] && \
   [ ! -f "$OC_DIR/opencode.json" ] && \
   cp /data/data/com.termux/files/usr/lib/opencode-termux/config/opencode.json "$OC_DIR/opencode.json"

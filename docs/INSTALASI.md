@@ -68,7 +68,7 @@ tanpa Node.js, checksum sha256 ikut terverifikasi via `SHA256SUMS.txt`.
 
 Semua file diunduh dari
 **[Releases](https://github.com/nemoobc/opencode-termux/releases)**. Ganti `{v}`
-dengan versi (contoh `1.20.3`), dan `-aarch64` dengan `-x86_64` kalau kamu di
+dengan versi (contoh `2.0.6.1`), dan `-aarch64` dengan `-x86_64` kalau kamu di
 emulator/PC. **Verifikasi dulu sebelum dipakai:** `sha256sum -c SHA256SUMS.txt`.
 
 | # | Artefak | Cara install / pakai |
@@ -76,7 +76,7 @@ emulator/PC. **Verifikasi dulu sebelum dipakai:** `sha256sum -c SHA256SUMS.txt`.
 | 1 | `nemoobc-opencode-termux-{v}.tgz` | Paket npm. `npm install -g ./nemoobc-opencode-termux-{v}.tgz` |
 | 2 | `opencode-termux-{v}-aarch64.tar.gz` | **Bundle offline arm64.** Taruh di folder yang sama dengan installer lalu `sh opencode-termux-installer.sh`. (Manual: `tar xzf ... -C ~/.local/lib/opencode-termux --strip-components=1`) |
 | 3 | `opencode-termux-{v}-x86_64.tar.gz` | Bundle offline untuk emulator/PC x64. Sama seperti #2. |
-| 4 | `opencode-agents-and-config.zip` | Agent + command + config saja. `unzip opencode-agents-and-config.zip -d ~/.config/opencode` (tidak menimpa `opencode.json` yang sudah ada). |
+| 4 | `opencode-config.zip` | Config default saja. `unzip opencode-config.zip -d ~/.config/opencode` (tidak menimpa `opencode.json` yang sudah ada). |
 | 5 | `opencode-termux-installer.sh` | **Installer universal.** `sh opencode-termux-installer.sh`. Di Termux memasang ke `$PREFIX/lib/opencode-termux` + `$PREFIX/bin`; di luar Termux ke `~/.local/{lib,bin}`. Bisa offline (bundle di sampingnya) atau online (unduh otomatis). |
 | 6 | `SHA256SUMS.txt` | Verifikasi keutuhan semua artefak: `sha256sum -c SHA256SUMS.txt`. |
 
@@ -94,7 +94,7 @@ sh opencode-termux-installer.sh       # pakai bundle -aarch64 di sampingnya
 ## 4️⃣ Verifikasi
 
 ```bash
-opencode-termux --version   # contoh: 1.18.22
+opencode-termux --version   # contoh: 2.0.6
 opencode-termux doctor      # diagnosis lengkap lingkungan
 ```
 

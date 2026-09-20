@@ -68,8 +68,10 @@ tar xzf "$WORK/bundle.tar.gz" -C "$LIBDIR" --strip-components=1
 # rm -f dulu agar ikut menimpa symlink npm lama (bukan menulis ke target-nya)
 rm -f "$BINDIR/opencode-termux"
 { printf '#!/bin/sh\n'
-  printf 'LD_LIBRARY_PATH="%s/vendor" exec "%s/vendor/ld-musl.so" "%s/vendor/opencode" "$@"\n' \
-    "$LIBDIR" "$LIBDIR" "$LIBDIR"
+  printf 'export LD_PRELOAD=\n'
+  printf 'export TMPDIR="${TMPDIR:-%s/tmp}"\n' "$LIBDIR"
+  printf 'mkdir -p "$TMPDIR"\n'
+  printf 'exec "%s/vendor/opencode" "$@"\n' "$LIBDIR"
 } > "$BINDIR/opencode-termux"
 chmod +x "$BINDIR/opencode-termux"
 

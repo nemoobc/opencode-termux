@@ -23,12 +23,11 @@ const IS_ANDROID = process.platform === "android"
 const T0 = Date.now()
 const log = m => console.log(`[opencode-termux] ${m}`)
 
-// Versi upstream: env > package.json > otomatis ambil terbaru dari registry
+// Versi upstream: env > package.json > default 2.0.6 (v2 — target sync)
 let V = process.env.OCX_UPSTREAM || pkgJson.opencodeUpstream
 if (!V) {
-  const latest = await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json()
-  V = latest.version
-  log(`upstream opencode-ai terbaru: ${V}`)
+  V = "2.0.6"
+  log(`upstream opencode default: ${V}`)
 }
 if (!IS_ANDROID && !FORCE) {
   log("Bukan Termux/Android — instalasi dilewati (pakai opencode-ai resmi).")
@@ -87,13 +86,26 @@ try {
   // Resolusi dinamis paket Alpine dari CDN (lihat lib/alpine.mjs)
   const pkg = name => alpinePkg(fetch, `https://dl-cdn.alpinelinux.org/alpine/${AV}/main/${A}`, name)
 
-  // 1) binary opencode (musl) dari npm resmi — diverifikasi sha512 registry
-  const ocTgz = `opencode-linux-${ARCH}-musl-${V}.tgz`
-  await dl(`https://registry.npmjs.org/opencode-linux-${ARCH}-musl/-/${ocTgz}`, `${work}/oc.tgz`)
-  log("verifikasi integritas sha512…")
-  const pk = await (await fetchWithRetry(fetch, `https://registry.npmjs.org/opencode-linux-${ARCH}-musl`, {}, 3)).json()
-  verifySha512(`${work}/oc.tgz`, expectedFromRegistry(pk, V))
-  untar(`${work}/oc.tgz`, `${work}/oc`)
+  // 1) binary opencode (musl)
+  const IS_V2 = V.startsWith("2.")
+  if (IS_V2) {
+    // v2 TIDAK ada di npm registry — unduh dari opencode.ai, verifikasi gzip + ukuran
+    const ocTgz = `opencode-linux-${ARCH}-musl.tar.gz`
+    await dl(`https://opencode.ai/files/bin/${V}/${ocTgz}`, `${work}/oc.tgz`)
+    log("verifikasi integritas (gzip + ukuran)…")
+    execFileSync("gzip", ["-t", `${work}/oc.tgz`], { stdio: "ignore" })
+    const sz = fs.statSync(`${work}/oc.tgz`).size
+    if (sz < 50 * 1024 * 1024) throw new Error(`binary mencurigakan (${sz} bytes)`)
+    untar(`${work}/oc.tgz`, `${work}/oc`)
+  } else {
+    // v1 dari npm resmi — diverifikasi sha512 registry
+    const ocTgz = `opencode-linux-${ARCH}-musl-${V}.tgz`
+    await dl(`https://registry.npmjs.org/opencode-linux-${ARCH}-musl/-/${ocTgz}`, `${work}/oc.tgz`)
+    log("verifikasi integritas sha512…")
+    const pk = await (await fetchWithRetry(fetch, `https://registry.npmjs.org/opencode-linux-${ARCH}-musl`, {}, 3)).json()
+    verifySha512(`${work}/oc.tgz`, expectedFromRegistry(pk, V))
+    untar(`${work}/oc.tgz`, `${work}/oc`)
+  }
 
   // 2) libgcc + libstdc++ (versi terbaru yang tersedia di CDN)
   const apkDir = `${work}/apk`; fs.mkdirSync(apkDir, { recursive: true })
@@ -102,6 +114,11 @@ try {
     await dl(`https://dl-cdn.alpinelinux.org/alpine/${AV}/main/${A}/${f}`, `${apkDir}/${f}`)
     untar(`${apkDir}/${f}`, apkDir)
   }
+
+  // 2b) patchelf — untuk patch PT_INTERP/RPATH (biar binary bisa re-exec sendiri)
+  const pf = await pkg("patchelf")
+  await dl(`https://dl-cdn.alpinelinux.org/alpine/${AV}/main/${A}/${pf}`, `${apkDir}/${pf}`)
+  untar(`${apkDir}/${pf}`, apkDir)
 
   // 3) rakit vendor/
   const vendor = path.join(__dirname, "vendor")
@@ -117,9 +134,33 @@ try {
     untar(`${work}/ap.tgz`, mini, ["lib"])
     cp(`${mini}/lib`, `ld-musl-${A}.so.1`); fs.renameSync(path.join(vendor, `ld-musl-${A}.so.1`), path.join(vendor, "ld-musl.so"))
   }
-  cp(`${work}/oc/package/bin`, "opencode")
+  if (IS_V2) {
+    cp(`${work}/oc`, "opencode")
+  } else {
+    cp(`${work}/oc/package/bin`, "opencode")
+  }
   cp(`${apkDir}/usr/lib`, "libstdc++.so.6"); cp(`${apkDir}/usr/lib`, "libstdc++.so.6.0.33"); cp(`${apkDir}/usr/lib`, "libgcc_s.so.1")
+  cp(`${apkDir}/usr/bin`, "patchelf")
   for (const f of fs.readdirSync(vendor)) fs.chmodSync(path.join(vendor, f), 0o755)
+
+  // 3b) patch ELF: PT_INTERP → vendor/ld-musl.so, RPATH → vendor
+  //     (biar binary bisa re-exec sendiri — wajib untuk opencode v2 background server)
+  const patchEnv = { ...process.env, LD_PRELOAD: "", LD_LIBRARY_PATH: vendor }
+  const interp = execFileSync(path.join(vendor, "ld-musl.so"),
+    [path.join(vendor, "patchelf"), "--print-interpreter", path.join(vendor, "opencode")],
+    { encoding: "utf8", env: patchEnv }).trim()
+  if (interp !== path.join(vendor, "ld-musl.so")) {
+    if (!interp) throw new Error("binary opencode korup/tidak terbaca")
+    log("patch ELF: PT_INTERP + RPATH…")
+    execFileSync(path.join(vendor, "ld-musl.so"),
+      [path.join(vendor, "patchelf"), "--set-interpreter", path.join(vendor, "ld-musl.so"), path.join(vendor, "opencode")],
+      { env: patchEnv })
+    execFileSync(path.join(vendor, "ld-musl.so"),
+      [path.join(vendor, "patchelf"), "--set-rpath", vendor, path.join(vendor, "opencode")],
+      { env: patchEnv })
+  } else {
+    log("binary sudah terpatch — skip")
+  }
 
   // 4) siapkan DNS config di prefix Termux (bisa ditulis TANPA root)
   function ensureEtc() {
@@ -144,25 +185,15 @@ try {
   } else {
     log("smoke test…")
     const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
-    execFileSync(path.join(vendor, "ld-musl.so"),
-      [path.join(vendor, "opencode"), "--version"],
+    execFileSync(path.join(vendor, "opencode"),
+      ["--version"],
       { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
   }
 
-  // 6) auto-install agents, commands & config opencode (tanpa menimpa milik user)
+  // 6) auto-install config opencode (tanpa menimpa milik user)
   try {
     const HOME = process.env.HOME || "/data/data/com.termux/files/home"
     const OC = path.join(HOME, ".config", "opencode")
-    for (const [srcDir, dstName] of [["agents", "agent"], ["commands", "command"]]) {
-      const src = path.join(__dirname, srcDir)
-      if (!fs.existsSync(src)) continue
-      const dst = path.join(OC, dstName)
-      fs.mkdirSync(dst, { recursive: true })
-      for (const f of fs.readdirSync(src)) {
-        fs.copyFileSync(path.join(src, f), path.join(dst, f))
-        log(`✅ terpasang: ${dstName}/${f}`)
-      }
-    }
     const cfgSrc = path.join(__dirname, "config", "opencode.json")
     const cfgDst = path.join(OC, "opencode.json")
     if (!fs.existsSync(cfgDst)) {
@@ -171,8 +202,17 @@ try {
     } else {
       log("config user sudah ada — tidak disentuh")
     }
+    // 6b) keybind cli.json — Tab untuk switch agent (build ↔ plan, gaya v1)
+    const cliSrc = path.join(__dirname, "config", "cli.json")
+    const cliDst = path.join(OC, "cli.json")
+    if (!fs.existsSync(cliDst)) {
+      fs.copyFileSync(cliSrc, cliDst)
+      log("✅ keybind default terpasang (Tab = switch agent)")
+    } else {
+      log("cli.json user sudah ada — tidak disentuh")
+    }
   } catch (e) {
-    log("auto-install agent dilewati:", e.message)
+    log("auto-install config dilewati:", e.message)
   }
 } catch (e) {
   console.error("[opencode-termux] ❌ instalasi gagal:", e.message)

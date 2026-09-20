@@ -1,6 +1,6 @@
 # 📱 opencode-termux
 
-**[opencode](https://opencode.ai) CLI native di Termux/Android — tanpa proot, tanpa root, plus agent & tools otomatis.**
+**[opencode](https://opencode.ai) CLI native di Termux/Android — tanpa proot, tanpa root.**
 
 [![npm](https://img.shields.io/npm/v/@nemoobc/opencode-termux?color=cb3837&logo=npm)](https://www.npmjs.com/package/@nemoobc/opencode-termux)
 [![release](https://img.shields.io/github/v/release/nemoobc/opencode-termux?color=3B82F6)](https://github.com/nemoobc/opencode-termux/releases)
@@ -37,31 +37,13 @@
 
 ---
 
-## 🤖 **Agent & Tools Otomatis (Sekali Install, Siap Pakai)**
+## 🧹 **Tanpa Agent / Command / Skill Bawaan**
 
-| Agent | Mode | Fungsi |
-|-------|------|--------|
-| **autodev** | primary | **Developer otonom universal multi-bahasa** — full lifecycle: audit → test → monitor → fix → compact |
-| **termux-coder** | primary | Coding assistant paham Termux (PATH, pkg, tanpa root, storage HP) |
-| **apk-builder** | primary | Spesialis build APK Android: payload, align, sign, release |
-| **tester** | subagent | Jalankan seluruh test suite (UI + mesin) + laporan pass/fail |
-| **fixer** | subagent | Loop perbaikan otomatis: uji → analisis → fix minimal → uji ulang (max 5x) |
+Paket ini **tidak** membundel agent, command, atau skill opencode — biar
+lingkungan kamu bersih dan bebas konflik dengan setup sendiri. Kalau butuh,
+pasang manual di `~/.config/opencode/`.
 
-| Command | Fungsi | Agent |
-|---------|--------|-------|
-| `/coder full` | **Full lifecycle otomatis: audit → test → monitor → fix → compact** | **autodev** |
-| `/coder audit` | Scan project lengkap: struktur, deps, security, style, arch | autodev |
-| `/coder test` | Jalankan semua test per bahasa (unit, integration, coverage) | autodev |
-| `/coder monitor` | Start daemon: file watch, CI status, perf baseline, log tail | autodev |
-| `/coder fix` | Auto-fix failure loop (max 5 iterasi per bug) | autodev |
-| `/coder compact` | Optimasi: dead code, format, deps, bundle, perf | autodev |
-| `/orchestrator full` | Koordinator tahapan dengan state persistence & resume | orchestrator |
-| `/test` | Seluruh test suite + laporan detail | tester |
-| `/fix` | Loop perbaiki tes gagal sampai hijau | fixer |
-| `/build-apk` | Build APK lengkap lewat agent apk-builder | apk-builder |
-| `/release` | Bump versi → tag → release → bersihkan | apk-builder |
-
-**Config default ikut terpasang:** model `opencode-zen/kimi-k2-5` (provider zen, OpenAI-compatible) — **tanpa API key**.
+**Config default ikut terpasang:** model `opencode/big-pickle` — **tanpa API key**.
 
 ---
 
@@ -96,14 +78,24 @@ Installer resmi `opencode-ai` gagal di Termux karena:
 
 ```
 opencode-termux (Node shim)
-   └─ vendor/ld-musl.so          ← musl libc custom build untuk Termux*
-        └─ vendor/opencode       ← binary resmi opencode-linux-arm64-musl
-             ⤳ LD_LIBRARY_PATH → libstdc++ / libgcc_s (dari Alpine)
+   └─ vendor/opencode       ← binary resmi opencode-linux-arm64-musl
+        ⤳ PT_INTERP → vendor/ld-musl.so   (patch ELF via patchelf)
+        ⤳ RPATH    → vendor/              (libstdc++ / libgcc_s dari Alpine)
 ```
 
 \* Path `/etc/resolv.conf` & `/etc/hosts` dipatch saat kompilasi menuju `$PREFIX/etc/` sehingga **DNS jalan tanpa root**.
 
+**Kenapa patch ELF (bukan invoke loader)?** opencode v2 spawn background server
+dengan **re-exec dirinya sendiri**. Kalau binary dijalankan via `ld-musl.so
+vendor/opencode`, re-exec itu gagal (`cannot load serve`). Dengan patch
+`PT_INTERP` + `RPATH`, binary jalan langsung — re-exec ikut jalan, server
+background normal.
+
 **Auto-heal:** Kalau `postinstall` terlewat (mis. `--ignore-scripts`), binary dipasang otomatis saat pertama kali jalan.
+
+**Auto-stop server:** Kalau TUI yang memulai server background, saat exit
+(`/exit` / Ctrl-C) server ikut dimatikan otomatis (hemat RAM/baterai). Kalau
+server sudah jalan duluan, dibiarkan — tidak membunuh sesi lain.
 
 ---
 
@@ -116,12 +108,12 @@ Setiap rilis (via `release.yml` → `scripts/build-release.sh`) menghasilkan **6
 | `nemoobc-opencode-termux-{v}.tgz` | `.tgz` | npm | Package untuk `npm install -g` |
 | `opencode-termux-{v}-aarch64.tar.gz` | `.tar.gz` | Termux ARM64 | **Offline bundle lengkap** (vendor musl + binary + source) |
 | `opencode-termux-{v}-x86_64.tar.gz` | `.tar.gz` | Emulator/x64 | Offline bundle x64 |
-| `opencode-agents-and-config.zip` | `.zip` | Manual | Agents + commands + config saja (bebas versi) |
+| `opencode-config.zip` | `.zip` | Manual | Config default saja (bebas versi) |
 | `opencode-termux-installer.sh` | `.sh` | Universal | **POSIX sh installer** (tanpa Node, offline-capable) |
 | `SHA256SUMS.txt` | `.txt` | Verify | Checksum sha256 semua file di atas |
 
 > 💡 **Philosophy:** Semua artefak berbundle **versioned** di nama (kecuali
-> `installer.sh` & `agents-and-config.zip` yang deliberately bebas versi agar
+> `installer.sh` & `opencode-config.zip` yang deliberately bebas versi agar
 > gampang ditimpa pada update). History tidak hilang — versi lama tetap di GitHub Releases & npm registry.
 
 ---
@@ -157,14 +149,14 @@ sh opencode-termux-installer.sh
 
 ### **Instalasi Per-Artefak**
 
-Semua file diunduh dari **[GitHub Releases](https://github.com/nemoobc/opencode-termux/releases)** (ganti `{v}` dengan versi, contoh `1.20.3`).
+Semua file diunduh dari **[GitHub Releases](https://github.com/nemoobc/opencode-termux/releases)** (ganti `{v}` dengan versi, contoh `2.0.6.1`).
 
 | # | Artefak | Cara Install / Pakai |
 |---|---------|----------------------|
 | 1 | `nemoobc-opencode-termux-{v}.tgz` | Paket npm. `npm install -g ./nemoobc-opencode-termux-{v}.tgz` (atau simpan lalu `npm install -g @nemoobc/opencode-termux`) |
 | 2 | `opencode-termux-{v}-aarch64.tar.gz` | **Bundle offline arm64.** Taruh di folder sama dengan installer lalu `sh opencode-termux-installer.sh` (atau ekstrak manual: `tar xzf opencode-termux-{v}-aarch64.tar.gz -C ~/.local/lib/opencode-termux --strip-components=1`) |
-| 3 | `opencode-termux-{v}-x86_64.tar.gz` | Sama seperti #2, tapi untuk emulator/PC **x64**. Bisa dijalankan manual: `./vendor/ld-musl.so ./vendor/opencode --version` |
-| 4 | `opencode-agents-and-config.zip` | **Agent + command + config saja.** Ekstrak ke `~/.config/opencode/`: `unzip opencode-agents-and-config.zip -d ~/.config/opencode` (tidak menimpa `opencode.json` yang sudah ada) |
+| 3 | `opencode-termux-{v}-x86_64.tar.gz` | Sama seperti #2, tapi untuk emulator/PC **x64**. Bisa dijalankan manual: `./vendor/opencode --version` |
+| 4 | `opencode-config.zip` | **Config default saja.** Ekstrak ke `~/.config/opencode/`: `unzip opencode-config.zip -d ~/.config/opencode` (tidak menimpa `opencode.json` yang sudah ada) |
 | 5 | `opencode-termux-installer.sh` | **Installer universal.** `sh opencode-termux-installer.sh`. Baca bundle `-{arch}.tar.gz` di folder yang sama (offline) atau unduh otomatis dari Releases (online). Target instalasi: Termux → `$PREFIX/{lib,bin}`, selain itu → `~/.local/{lib,bin}` |
 | 6 | `SHA256SUMS.txt` | **Verifikasi.** Sebelum install, cek keutuhan: `sha256sum -c SHA256SUMS.txt` (jalankan di folder berisi semua file artefak) |
 
@@ -204,8 +196,25 @@ mkdir -p ~/project-coba && cd ~/project-coba
 opencode-termux
 ```
 
-**Config default** sudah terpasang otomatis dengan **model `opencode-zen/kimi-k2-5`** (provider zen) — **tanpa API key**.  
+**Config default** sudah terpasang otomatis dengan **model `opencode/big-pickle`** — **tanpa API key**.  
 Lokasi: `~/.config/opencode/opencode.json` (milik user; installer **tidak pernah menimpa**).
+
+**Keybind default** ikut terpasang: **Tab = switch agent (build ↔ plan)**,
+gaya v1. Di opencode v2 defaultnya `shift+tab` (Tab dipakai autocomplete) —
+paket ini override lewat `~/.config/opencode/cli.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "keybinds": {
+    "agent.cycle": "tab",
+    "agent.cycle.reverse": "shift+tab"
+  }
+}
+```
+
+Tab ganti Build ↔ Plan, Shift+Tab balik. Verifikasi: footer TUI menampilkan
+`tab agents`. Kalau `cli.json` user sudah ada, installer **tidak menimpa**.
 
 ---
 
@@ -238,7 +247,6 @@ CI GitHub menjalankan:
 | **[INSTALASI.md](docs/INSTALASI.md)** | Panduan end-to-end: persyaratan → install → verifikasi → update/uninstall → troubleshooting → FAQ |
 | **[RELEASE-HISTORY.md](RELEASE-HISTORY.md)** | Release notes adaptif semua versi (auto-generated) |
 | **prebuilt/README.md** | Cara rebuild musl loader custom |
-| **Agent & Command** | `agents/*.md` & `commands/*.md` — docs per agent/command |
 
 ---
 
@@ -279,7 +287,7 @@ ls -la dist/
 | [npm Versions](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) | History versi npm |
 | [RELEASE-HISTORY.md](RELEASE-HISTORY.md) | Release notes/riwayat perubahan per versi |
 
-**Skema versi:** `paket.opencodeUpstream.patch` — contoh: `1.20.3` (paket v1.20, upstream opencode-ai 1.18.23, patch 3)
+**Skema versi:** `paket.opencodeUpstream.patch` — contoh: `2.0.6.1` (paket v2.0, upstream opencode 2.0.6, patch 1)
 
 ### 🔄 Alur Rilis Otomatis (kendali tunggal: `sync-upstream`)
 
@@ -305,9 +313,7 @@ Rilis manual (mis. commit fitur/perbaikan): naikkan versi di `package.json` → 
 5. Review & merge
 
 **Ide kontribusi:**
-- Tambah agent/command baru di `agents/` & `commands/`
 - Perbaiki docs di `docs/`
-- Tambah bahasa support di skills (Rust, PHP, Ruby, dll)
 - Optimasi musl loader build
 - CI/CD improvement
 

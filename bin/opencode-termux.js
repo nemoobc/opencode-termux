@@ -45,15 +45,40 @@ function ensureDns() {
   } catch {}
 }
 
-function runBinary(args) {
+function cleanEnv() {
   // LD_PRELOAD bawaan Termux (libtermux-exec) dibuat untuk Bionic dan akan
   // gagal relokasi jika ikut dimuat ke proses musl — jadi selalu dibersihkan.
-  const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
+  const { LD_PRELOAD, LD_PRELOAD_32BIT, ...rest } = process.env
+  return rest
+}
+
+// TMPDIR: /tmp di Termux read-only — pastikan ada lokasi writable.
+function ensureTmp() {
+  if (process.env.TMPDIR && fs.existsSync(process.env.TMPDIR)) return
+  const t = path.join(PREFIX, "tmp")
+  fs.mkdirSync(t, { recursive: true })
+  process.env.TMPDIR = t
+}
+
+function runBinary(args) {
+  ensureTmp()
   ensureDns()
-  const r = spawnSync(loader, [bin, ...args], {
-    stdio: "inherit",
-    env: { ...cleanEnv, LD_LIBRARY_PATH: vendor },
-  })
+  const env = cleanEnv()
+  // Binary sudah dipatch PT_INTERP → ld-musl, jadi eksekusi langsung (bukan
+  // via loader) — ini yang membuat opencode v2 bisa spawn background server
+  // (re-exec dirinya sendiri).
+  const interactive = args.length === 0 || args[0] === "mini"
+  let serverWasRunning = false
+  if (interactive) {
+    const s = spawnSync(bin, ["service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"] })
+    serverWasRunning = s.status === 0 && s.stdout.trim() !== "stopped"
+  }
+  const r = spawnSync(bin, args, { stdio: "inherit", env })
+  // Auto-stop: kalau TUI yang memulai server, exit = server ikut mati.
+  // Kalau server sudah jalan duluan, biarkan (jangan bunuh sesi lain).
+  if (interactive && !serverWasRunning) {
+    spawnSync(bin, ["service", "stop"], { stdio: "ignore", env })
+  }
   if (r.error) {
     console.error("[opencode-termux] gagal menjalankan binary:", r.error.message)
     return 1
@@ -134,10 +159,9 @@ function cmdDoctor() {
   })
   cek("binary opencode", () => {
     if (!ready()) throw new Error("binary belum terpasang")
-    const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
-    const out = spawnSync(loader, [bin, "--version"], {
+    const out = spawnSync(bin, ["--version"], {
       encoding: "utf8",
-      env: { ...cleanEnv, LD_LIBRARY_PATH: vendor },
+      env: cleanEnv(),
     })
     if (out.status !== 0) throw new Error("gagal dieksekusi")
     return `v${out.stdout.trim()}`
@@ -150,10 +174,9 @@ function cmdDoctor() {
 function cmdVersion() {
   let binVer = "(belum terpasang)"
   if (ready()) {
-    const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
-    const out = spawnSync(loader, [bin, "--version"], {
+    const out = spawnSync(bin, ["--version"], {
       encoding: "utf8",
-      env: { ...cleanEnv, LD_LIBRARY_PATH: vendor },
+      env: cleanEnv(),
     })
     if (out.status === 0 && out.stdout.trim()) binVer = out.stdout.trim()
   }

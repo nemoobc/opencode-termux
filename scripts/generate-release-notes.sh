@@ -40,7 +40,7 @@ cat <<EOF
 # 📦 opencode-termux v$VER — Release Notes
 
 **Tanggal:** $DATE  
-**Upstream:** opencode-ai v$UPSTREAM  
+**Upstream:** opencode v$UPSTREAM  
 **Platform:** Android/Termux (ARM64)  
 **Lisensi:** MIT
 
@@ -147,7 +147,7 @@ opencode-termux
 
 ---
 
-## 🔄 Upstream Changes (opencode-ai v$UPSTREAM)
+## 🔄 Upstream Changes (opencode v$UPSTREAM)
 
 $UPSTREAM_CHANGES
 
@@ -167,7 +167,7 @@ $CHANGELOG
 | \`README.md\` | Ringkasan project + quick start + attribution |
 | \`CHANGELOG.md\` | Riwayat perubahan kumulatif |
 | \`prebuilt/README.md\` | Cara rebuild musl loader |
-| Agent & Command docs | Di \`agents/\` & \`commands/\` |
+| Config docs | Di \`config/\` |
 
 > 💡 **Philosophy:** Semua docs *versioned* — upgrade ke v$VER+1, file v$VER tetap ada di GitHub Releases. History tidak hilang.
 
@@ -214,7 +214,7 @@ EOF
   echo ""
   cat <<EOF
 # v$VER ($DATE)
-Upstream: opencode-ai v$UPSTREAM
+Upstream: opencode v$UPSTREAM
 
 $CHANGELOG
 EOF
