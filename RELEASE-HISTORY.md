@@ -2,7 +2,7 @@
 
 ---
 
-# v2.0.6.1 (2026-09-20)
+# v1.20.12 (2026-09-20)
 Upstream: opencode v2.0.6
 
 **Perubahan besar — pindah ke opencode v2 (patch ELF, bukan invoke loader):**
