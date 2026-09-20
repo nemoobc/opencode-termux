@@ -32,6 +32,26 @@ function heal() {
   return true
 }
 
+// Bandingkan versi semver: return 1 (a>b), -1 (a<b), 0 (sama)
+function cmpVer(a, b) {
+  const pa = a.split(".").map(Number), pb = b.split(".").map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1
+  }
+  return 0
+}
+
+// Ambil versi terbaru dari npm registry (mode v2 pakai @opencode/cli)
+async function latestUpstream() {
+  try {
+    const reg = PKG.opencodeUpstream?.startsWith("2.") ? "@opencode/cli" : "opencode-ai"
+    const res = await fetch(`https://registry.npmjs.org/${reg}/latest`)
+    if (res.ok) { const d = await res.json(); if (d.version) return d.version }
+  } catch {}
+  return null
+}
+
 // DNS fix: musl hasil build kita membaca config dari prefix Termux —
 // pastikan filenya ada (bisa ditulis tanpa root).
 function ensureDns() {
@@ -64,20 +84,18 @@ function runBinary(args) {
   ensureTmp()
   ensureDns()
   const env = cleanEnv()
-  // Binary sudah dipatch PT_INTERP → ld-musl, jadi eksekusi langsung (bukan
-  // via loader) — ini yang membuat opencode v2 bisa spawn background server
-  // (re-exec dirinya sendiri).
   const interactive = args.length === 0 || args[0] === "mini"
   let serverWasRunning = false
   if (interactive) {
-    const s = spawnSync(bin, ["service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"] })
+    const s = spawnSync(loader, ["--library-path", vendor, bin, "service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"] })
     serverWasRunning = s.status === 0 && s.stdout.trim() !== "stopped"
   }
-  const r = spawnSync(bin, args, { stdio: "inherit", env })
-  // Auto-stop: kalau TUI yang memulai server, exit = server ikut mati.
-  // Kalau server sudah jalan duluan, biarkan (jangan bunuh sesi lain).
+  // Invoke via loader langsung (bukan binary patched) — patchelf --set-interpreter
+  // merusakkan binary 200MB+ (menambah PT_INTERP segment, memindahkan offset → SIGSEGV).
+  // Loader di-invoke sebagai interpreter langsung: ld-musl.so --library-path vendor opencode.
+  const r = spawnSync(loader, ["--library-path", vendor, bin, ...args], { stdio: "inherit", env })
   if (interactive && !serverWasRunning) {
-    spawnSync(bin, ["service", "stop"], { stdio: "ignore", env })
+    spawnSync(loader, ["--library-path", vendor, bin, "service", "stop"], { stdio: "ignore", env })
   }
   if (r.error) {
     console.error("[opencode-termux] gagal menjalankan binary:", r.error.message)
@@ -102,9 +120,9 @@ async function cmdUpdate() {
   }
   // sinkronkan pin di package.json modul agar auto-heal berikutnya konsisten
   try {
-    const latest = await (await fetch("https://registry.npmjs.org/opencode-ai/latest")).json()
-    if (latest.version && latest.version !== PKG.opencodeUpstream) {
-      PKG.opencodeUpstream = latest.version
+    const latest = await latestUpstream()
+    if (latest && cmpVer(latest, PKG.opencodeUpstream) > 0) {
+      PKG.opencodeUpstream = latest
       fs.writeFileSync(path.join(root, "package.json"), JSON.stringify(PKG, null, 2) + "\n")
     }
   } catch {}
@@ -159,7 +177,7 @@ function cmdDoctor() {
   })
   cek("binary opencode", () => {
     if (!ready()) throw new Error("binary belum terpasang")
-    const out = spawnSync(bin, ["--version"], {
+    const out = spawnSync(loader, ["--library-path", vendor, bin, "--version"], {
       encoding: "utf8",
       env: cleanEnv(),
     })
@@ -174,7 +192,7 @@ function cmdDoctor() {
 function cmdVersion() {
   let binVer = "(belum terpasang)"
   if (ready()) {
-    const out = spawnSync(bin, ["--version"], {
+    const out = spawnSync(loader, ["--library-path", vendor, bin, "--version"], {
       encoding: "utf8",
       env: cleanEnv(),
     })

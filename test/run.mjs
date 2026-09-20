@@ -227,6 +227,24 @@ t("identitas: entrypoint bernama opencode-termux.js (bukan opencode.js)", () => 
   ok(lock.includes('"opencode-termux": "bin/opencode-termux.js"'), "package-lock belum ikut")
 })
 
+// ===== 8c. versi sinkron =====
+t("versi: package-lock.json sinkron dengan package.json", () => {
+  const p = json("package.json")
+  const l = json("package-lock.json")
+  ok(l.version === p.version, `lock ${l.version} ≠ pkg ${p.version}`)
+})
+t("versi: RELEASE-HISTORY memuat entry versi paket terbaru", () => {
+  const p = json("package.json")
+  ok(read("RELEASE-HISTORY.md").includes(`# v${p.version}`), `entry '# v${p.version}' hilang dari RELEASE-HISTORY.md`)
+})
+t("vendor: symlink libc.musl-*.so.1 → ld-musl.so ada (DT_NEEDED terpenuhi)", () => {
+  if (!fs.existsSync(path.join(root, "vendor"))) return // vendor hanya ada setelah install
+  const libc = fs.readdirSync(path.join(root, "vendor")).find(f => f.startsWith("libc.musl-"))
+  ok(libc, "libc.musl-*.so.1 symlink hilang dari vendor/")
+  const target = fs.readlinkSync(path.join(root, "vendor", libc))
+  ok(target === "ld-musl.so", `symlink target salah: ${target}`)
+})
+
 // ===== 9. E2E opsional (--e2e atau OCX_E2E=1) =====
 if (E2E) {
   // arsitektur e2e: default x64 (CI ubuntu), override OCX_ARCH untuk host arm64

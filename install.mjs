@@ -143,24 +143,18 @@ try {
   cp(`${apkDir}/usr/bin`, "patchelf")
   for (const f of fs.readdirSync(vendor)) fs.chmodSync(path.join(vendor, f), 0o755)
 
-  // 3b) patch ELF: PT_INTERP → vendor/ld-musl.so, RPATH → vendor
-  //     (biar binary bisa re-exec sendiri — wajib untuk opencode v2 background server)
-  const patchEnv = { ...process.env, LD_PRELOAD: "", LD_LIBRARY_PATH: vendor }
-  const interp = execFileSync(path.join(vendor, "ld-musl.so"),
-    [path.join(vendor, "patchelf"), "--print-interpreter", path.join(vendor, "opencode")],
-    { encoding: "utf8", env: patchEnv }).trim()
-  if (interp !== path.join(vendor, "ld-musl.so")) {
-    if (!interp) throw new Error("binary opencode korup/tidak terbaca")
-    log("patch ELF: PT_INTERP + RPATH…")
-    execFileSync(path.join(vendor, "ld-musl.so"),
-      [path.join(vendor, "patchelf"), "--set-interpreter", path.join(vendor, "ld-musl.so"), path.join(vendor, "opencode")],
-      { env: patchEnv })
-    execFileSync(path.join(vendor, "ld-musl.so"),
-      [path.join(vendor, "patchelf"), "--set-rpath", vendor, path.join(vendor, "opencode")],
-      { env: patchEnv })
-  } else {
-    log("binary sudah terpatch — skip")
+  // 3b) symlink libc.musl → ld-musl.so (biar DT_NEEDED libc.musl-*.so.1 terpenuhi)
+  const libcName = `libc.musl-${A}.so.1`
+  const libcLink = path.join(vendor, libcName)
+  if (!fs.existsSync(libcLink)) {
+    fs.symlinkSync("ld-musl.so", libcLink)
+    log(`symlink ${libcName} → ld-musl.so`)
   }
+
+  // 3c) patchelf DILARANG untuk binary besar (200MB+) — patchelf --set-interpreter
+  //     menambah PT_INTERP segment baru, memindahkan offset, dan MERUSAKKAN binary
+  //     (SIGSEGV). Solusi: bin/opencode-termux.js invoke binary VIA loader langsung
+  //     (ld-musl.so --library-path vendor opencode), sehingga PT_INTERP tidak diperlukan.
 
   // 4) siapkan DNS config di prefix Termux (bisa ditulis TANPA root)
   function ensureEtc() {
@@ -179,14 +173,15 @@ try {
   }
   ensureEtc()
 
-  // 5) smoke test (LD_PRELOAD termux-exec dibuang: tidak kompatibel dengan musl)
+  // 5) smoke test — invoke via loader langsung (bukan binary patched, karena
+  //     patchelf corrupt binary 200MB+)
   if (process.env.OCX_SKIP_SMOKE === "1") {
     log("smoke test dilewati (OCX_SKIP_SMOKE=1 — mode cross-build)")
   } else {
     log("smoke test…")
     const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
-    execFileSync(path.join(vendor, "opencode"),
-      ["--version"],
+    execFileSync(path.join(vendor, "ld-musl.so"),
+      ["--library-path", vendor, path.join(vendor, "opencode"), "--version"],
       { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
   }
 

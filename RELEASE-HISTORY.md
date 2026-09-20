@@ -2,6 +2,26 @@
 
 ---
 
+# v1.20.14 (2026-09-20)
+Upstream: opencode v2.0.11
+
+- sync: upstream opencode 2.0.11 (4f9e4eb).
+- **Konsistensi versi**: package-lock.json kini ikut di-bump oleh workflow
+  sync-upstream (sebelumnya lock terjebak di v2.0.6.1 — npm ci melihat versi
+  basi). Detektor baru di `test/run.mjs` mengunci lock.version = package.version.
+- **Perbaikan `update`**: `opencode-termux update` pada mode v2 tidak lagi
+  men-downgrade pin upstream ke opencode-ai v1 (bug: selalu mengambil latest
+  dari registry npm walau paket ini mode opencode v2). Kini versi v2 terbaru
+  diambil dari listing opencode.ai dan pin **hanya naik** (cmpVer).
+- **FIX patchelf corruption**: `patchelf --set-interpreter` dengan path absolut
+  panjang menambah PT_INTERP segment baru → memindahkan offset → binary 200MB+
+  SIGSEGV. Fix: semua invokasi binary sekarang via loader langsung
+  (`ld-musl.so --library-path vendor opencode`) — PT_INTERP tidak diperlukan.
+  Symlink `libc.musl-*.so.1 → ld-musl.so` ditambah untuk memenuhi DT_NEEDED.
+  E2E x64 kini hijau (39/39).
+- **FIX args spread**: `spawnSync(loader, [..., args])` → args jadi nested
+  array, binary terima empty string → `chdir("")` gagal. Fix: `...args` (spread).
+
 # v1.20.12 (2026-09-20)
 Upstream: opencode v2.0.6
 

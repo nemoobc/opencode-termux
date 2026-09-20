@@ -55,8 +55,8 @@ Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) ba
 ┌─────────────────────────────────────────────────────────────┐
 │  sync-upstream.yml (cron 0 */6 * * *)                        │
 ├─────────────────────────────────────────────────────────────┤
-│  1. Cek npm registry: opencode-ai latest version            │
-│  2. Kalau baru: bump opencodeUpstream + version patch       │
+│  1. Cek npm registry @opencode/cli (v2)                       │
+│  2. Bump opencodeUpstream + version patch                     │
 │  3. Anti-bentrok: cek tag GitHub & npm registry             │
 │  4. Commit + tag vX.Y.Z + push                              │
 │  5. Trigger release.yml (build 6 artefak)                   │
