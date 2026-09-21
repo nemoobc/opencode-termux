@@ -151,15 +151,31 @@ try {
     log(`symlink ${libcName} → ld-musl.so`)
   }
 
-  // 3c) patchelf DILARANG untuk binary besar (200MB+) — TERBUKTI korup:
-  //     --set-interpreter menambah PT_INTERP segment baru, memindahkan offset,
-  //     binary SIGSEGV bahkan saat di-invoke via loader (terbukti di runner
-  //     x64: status null, signal SIGSEGV — binary 195MB jadi sampah).
-  //     Solusi: bin/opencode-termux.js SELALU invoke binary VIA loader langsung
-  //     (ld-musl.so --library-path vendor opencode), sehingga PT_INTERP tidak
-  //     diperlukan. Masalah re-exec server TUI ("cannot load serve") diatasi
-  //     di wrapper: server dinyalakan eksplisit via loader SEBELUM TUI jalan,
-  //     jadi TUI tak perlu re-exec sendiri (lihat ensureServer).
+  // 3c) patchelf --set-interpreter SAJA (tanpa --set-rpath!) — HANYA saat native.
+  //     Fakta dari matriks uji (x64): --set-interpreter saja + LD_LIBRARY_PATH
+  //     = jalan (v2.0.11); --set-rpath = SIGSEGV, binary 195MB jadi sampah
+  //     bahkan via loader. Jadi RPATH DILARANG SELAMANYA; libstdc++/libgcc
+  //     dipenuhi lewat LD_LIBRARY_PATH yang di-set wrapper (lihat cleanEnv).
+  //     Tanpa INTERP benar, re-exec background server gagal ("cannot load
+  //     serve") dan TUI tidak start.
+  //     Cross-build (host ≠ target) patch-nya DILEWATI — loader/patchelf target
+  //     tak bisa dieksekusi di host; bundle di-patch saat first-run di
+  //     perangkat (ensurePatched di bin/opencode-termux.js, selalu native).
+  {
+    const targetArch = ARCH === "x64" ? "x64" : "arm64"
+    const hostArch = process.arch === "arm64" ? "arm64" : "x64"
+    if (targetArch !== hostArch) {
+      log(`patch PT_INTERP dilewati (cross-build ${hostArch}→${targetArch} — di-patch saat first-run di perangkat)`)
+    } else {
+      const loaderBin = path.join(vendor, "ld-musl.so")
+      const { LD_PRELOAD, LD_PRELOAD_32BIT, ...noPreload } = process.env
+      log("patch PT_INTERP ke vendor lokal (tanpa RPATH)…")
+      execFileSync(loaderBin,
+        ["--library-path", vendor, path.join(vendor, "patchelf"),
+          "--set-interpreter", loaderBin, path.join(vendor, "opencode")],
+        { stdio: "ignore", env: noPreload })
+    }
+  }
 
   // 4) siapkan DNS config di prefix Termux (bisa ditulis TANPA root)
   function ensureEtc() {
@@ -178,15 +194,14 @@ try {
   }
   ensureEtc()
 
-  // 5) smoke test — invoke via loader langsung (binary tak pernah di-patch:
-  //     patchelf corrupt binary 200MB+ → SIGSEGV, terbukti di runner x64).
+  // 5) smoke test — binary langsung (sudah di-patch PT_INTERP di 3c,
+  //     atau dilewati saat cross-build). LD_LIBRARY_PATH memenuhi libstdc++.
   if (process.env.OCX_SKIP_SMOKE === "1") {
     log("smoke test dilewati (OCX_SKIP_SMOKE=1 — mode cross-build)")
   } else {
     log("smoke test…")
     const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
-    execFileSync(path.join(vendor, "ld-musl.so"),
-      ["--library-path", vendor, path.join(vendor, "opencode"), "--version"],
+    execFileSync(path.join(vendor, "opencode"), ["--version"],
       { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
   }
 

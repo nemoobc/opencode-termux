@@ -80,41 +80,68 @@ function ensureTmp() {
   process.env.TMPDIR = t
 }
 
-function runOc(args, opts) {
-  // SELALU invoke via loader langsung (binary tak pernah di-patch —
-  // patchelf corrupt binary 200MB+ → SIGSEGV, terbukti di runner x64).
-  // Loader di-invoke sebagai interpreter langsung:
-  // ld-musl.so --library-path vendor opencode.
-  return spawnSync(loader, ["--library-path", vendor, bin, ...args], opts)
+function ocEnv(extra = {}) {
+  // LD_LIBRARY_PATH memenuhi libstdc++/libgcc (RPATH dilarang: --set-rpath
+  // = SIGSEGV). Hanya untuk anak opencode — process node sendiri tak tersentuh.
+  return { ...cleanEnv(), ...extra, LD_LIBRARY_PATH: vendor };
 }
 
-// TUI butuh background server, tapi server yang di-spawn TUI via re-exec
-// dirinya sendiri gagal saat invoke via loader (/proc/self/exe = loader
-// → "cannot load serve"). Solusi: wrapper menyalakan server eksplisit
-// SEBELUM TUI jalan — TUI menemukan server sudah hidup dan tak perlu re-exec.
-// Mengembalikan true bila server sudah/harus dimatikan wrapper saat exit.
-function ensureServer(env) {
-  const s = runOc(["service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"], timeout: 15000 })
-  if (!s.error && s.status === 0 && (s.stdout || "").trim() !== "stopped") return false
-  console.log("[opencode-termux] menyalakan background server…")
-  const r = runOc(["service", "start"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"], timeout: 60000 })
-  if (r.error || r.status !== 0) {
-    console.error("[opencode-termux] server gagal dinyalakan — TUI mungkin gagal start.")
-    return false
+function runOc(args, opts = {}) {
+  // Exec langsung dulu (binary di-patch PT_INTERP saat install/first-run) —
+  // re-exec background server butuh /proc/self/exe = binary opencode.
+  // Fallback ke invoke via loader (cukup untuk perintah sekali-jalan).
+  const env = ocEnv(opts.env);
+  const direct = spawnSync(bin, args, { ...opts, env });
+  if (!direct.error) return direct;
+  return spawnSync(loader, ["--library-path", vendor, bin, ...args], { ...opts, env });
+}
+
+// True bila string PT_INTERP binary sudah menunjuk loader vendor lokal.
+// .interp selalu di awal file → cukup baca 8KB pertama (murah, tiap run).
+function interpPatched() {
+  try {
+    const fd = fs.openSync(bin, "r");
+    const buf = Buffer.alloc(8192);
+    fs.readSync(fd, buf, 0, 8192, 0);
+    fs.closeSync(fd);
+    return buf.includes(path.join(vendor, "ld-musl.so"));
+  } catch { return false; }
+}
+
+// Bundle cross-build datang belum di-patch (install.mjs melewati patch saat
+// cross). Patch INTERP SAJA di sini — selalu native (jalan di perangkat),
+// TANPA --set-rpath (terbukti SIGSEGV). Idempoten: sekali saja.
+function ensurePatched() {
+  if (!ready() || interpPatched()) return true;
+  const patcher = path.join(vendor, "patchelf");
+  if (!fs.existsSync(patcher)) return false;
+  console.log("[opencode-termux] patch PT_INTERP ke vendor lokal (tanpa RPATH)…");
+  const env = ocEnv();
+  const r = spawnSync(loader,
+    ["--library-path", vendor, patcher, "--set-interpreter", loader, bin],
+    { stdio: "ignore", env });
+  const v = spawnSync(bin, ["--version"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"] });
+  if (r.error || r.status !== 0 || v.error || v.status !== 0 || !interpPatched()) {
+    console.error("[opencode-termux] patch gagal — perintah sekali-jalan tetap bisa, TUI butuh binary ter-patch.");
+    return false;
   }
-  return true
+  return true;
 }
 
 function runBinary(args) {
-  ensureTmp()
-  ensureDns()
-  const env = cleanEnv()
-  const interactive = args.length === 0 || args[0] === "mini"
-  let stopServer = false
-  if (interactive) stopServer = ensureServer(env)
-  const r = runOc(args, { stdio: "inherit", env })
-  if (interactive && stopServer) {
-    runOc(["service", "stop"], { stdio: "ignore", env, timeout: 15000 })
+  ensureTmp();
+  ensureDns();
+  ensurePatched();
+  const env = ocEnv();
+  const interactive = args.length === 0 || args[0] === "mini";
+  let serverWasRunning = false;
+  if (interactive) {
+    const s = runOc(["service", "status"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    serverWasRunning = !s.error && s.status === 0 && (s.stdout || "").trim() !== "stopped";
+  }
+  const r = runOc(args, { stdio: "inherit" });
+  if (interactive && !serverWasRunning) {
+    runOc(["service", "stop"], { stdio: "ignore", timeout: 15000 });
   }
   if (r.error) {
     console.error("[opencode-termux] gagal menjalankan binary:", r.error.message)

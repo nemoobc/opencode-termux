@@ -15,11 +15,10 @@ Upstream: opencode v2.0.11
   diambil dari listing opencode.ai dan pin **hanya naik** (cmpVer).
 - **FIX TUI cannot-load-serve**: invoke binary via loader langsung merusak
   `/proc/self/exe` sehingga re-exec background server gagal dan TUI tidak
-  start. Binary TIDAK di-patch (`patchelf --set-interpreter` terbukti
-  merusakkan binary 200MB+ → SIGSEGV bahkan via loader). Solusi: wrapper
-  menyalakan server eksplisit via loader SEBELUM TUI jalan (`ensureServer`),
-  TUI menemukan server hidup dan tak perlu re-exec. Auto-stop setelah exit
-  tetap jalan (hemat RAM/baterai).
+  start. Solusi: patch `PT_INTERP` saja ke loader vendor (interp-only —
+  `--set-rpath` terbukti bikin SIGSEGV di x64; lib dipenuhi `LD_LIBRARY_PATH`).
+  Patch saat install bila native, atau first-run di perangkat (`ensurePatched`,
+  idempoten). Auto-stop server setelah TUI exit tetap jalan (hemat RAM/baterai).
   Symlink `libc.musl-*.so.1 → ld-musl.so` ditambah untuk memenuhi DT_NEEDED.
 - **FIX args spread**: `spawnSync(loader, [..., args])` → args jadi nested
   array, binary terima empty string → `chdir("")` gagal. Fix: `...args` (spread).

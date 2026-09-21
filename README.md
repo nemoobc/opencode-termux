@@ -93,10 +93,13 @@ dijalankan lewat loader musl langsung.
 
 **Terus background server-nya?** opencode v2 spawn server background dengan
 **re-exec dirinya sendiri** — via loader, re-exec itu gagal
-(`cannot load serve`, karena `/proc/self/exe` = loader). Solusinya di shim:
-sebelum TUI jalan, wrapper menyalakan server eksplisit (`service start`),
-TUI menemukan server sudah hidup dan tidak perlu re-exec (`ensureServer`
-di `bin/opencode-termux.js`).
+(`cannot load serve`, karena `/proc/self/exe` = loader). Solusinya: binary
+di-patch `PT_INTERP`-nya saja ke loader vendor (interp-only, **tanpa RPATH**
+— `--set-rpath` terbukti bikin SIGSEGV; lib dipenuhi via `LD_LIBRARY_PATH`).
+Patch saat install bila native, atau otomatis saat first-run di perangkat
+(`ensurePatched` di `bin/opencode-termux.js`, selalu native, idempoten).
+Dengan INTERP benar, binary jalan langsung — re-exec ikut jalan, server
+background normal.
 
 **Auto-heal:** Kalau `postinstall` terlewat (mis. `--ignore-scripts`), binary dipasang otomatis saat pertama kali jalan.
 
