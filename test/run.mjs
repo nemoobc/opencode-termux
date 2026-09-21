@@ -96,6 +96,12 @@ t("workflow bersihkan: permission actions + loop delete", () => {
   ok(/permissions:\s*\n\s*actions: write/.test(y), "permission actions: write hilang")
   ok(/DELETE/.test(y), "tidak ada panggilan DELETE run gagal")
 })
+t("workflow test: job e2e x64 memaksa install (OCX_FORCE+OCX_ARCH)", () => {
+  const y = read(".github/workflows/test.yml")
+  const x64 = y.split("e2e-x64:")[1].split("e2e-arm64:")[0]
+  ok(/OCX_FORCE=1/.test(x64), "e2e-x64 tanpa OCX_FORCE — install.mjs dilewati, vendor tak terbentuk")
+  ok(/OCX_ARCH=x64/.test(x64), "e2e-x64 tanpa OCX_ARCH=x64 — binary arm64 tak bisa jalan di host amd64")
+})
 t("workflow test: punya job e2e arm64 (validasi loader prebuilt)", () => {
   const y = read(".github/workflows/test.yml")
   ok(/e2e-arm64:/.test(y), "job e2e-arm64 hilang")
