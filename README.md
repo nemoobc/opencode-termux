@@ -79,17 +79,24 @@ Installer resmi `opencode-ai` gagal di Termux karena:
 ```
 opencode-termux (Node shim)
    └─ vendor/opencode       ← binary resmi opencode-linux-arm64-musl
-        ⤳ PT_INTERP → vendor/ld-musl.so   (patch ELF via patchelf)
-        ⤳ RPATH    → vendor/              (libstdc++ / libgcc_s dari Alpine)
+        ⤳ dijalankan via vendor/ld-musl.so --library-path vendor/
+           (invoke loader — binary TIDAK di-patch; patchelf terbukti
+            merusakkan binary 200MB+ → SIGSEGV)
 ```
 
 \* Path `/etc/resolv.conf` & `/etc/hosts` dipatch saat kompilasi menuju `$PREFIX/etc/` sehingga **DNS jalan tanpa root**.
 
-**Kenapa patch ELF (bukan invoke loader)?** opencode v2 spawn background server
-dengan **re-exec dirinya sendiri**. Kalau binary dijalankan via `ld-musl.so
-vendor/opencode`, re-exec itu gagal (`cannot load serve`). Dengan patch
-`PT_INTERP` + `RPATH`, binary jalan langsung — re-exec ikut jalan, server
-background normal.
+**Kenapa invoke loader (bukan patch ELF)?** `patchelf --set-interpreter`
+menambah segment baru, memindahkan offset, dan MERUSAKKAN binary besar
+(SIGSEGV — terbukti di runner x64). Jadi binary dibiarkan apa adanya dan
+dijalankan lewat loader musl langsung.
+
+**Terus background server-nya?** opencode v2 spawn server background dengan
+**re-exec dirinya sendiri** — via loader, re-exec itu gagal
+(`cannot load serve`, karena `/proc/self/exe` = loader). Solusinya di shim:
+sebelum TUI jalan, wrapper menyalakan server eksplisit (`service start`),
+TUI menemukan server sudah hidup dan tidak perlu re-exec (`ensureServer`
+di `bin/opencode-termux.js`).
 
 **Auto-heal:** Kalau `postinstall` terlewat (mis. `--ignore-scripts`), binary dipasang otomatis saat pertama kali jalan.
 
@@ -271,8 +278,6 @@ ls -la dist/
 | `npm run postinstall` | Install bundle vendor (auto dijalankan npm) |
 | `npm test` | Struktur + unit test |
 | `npm run test:e2e` | E2E test penuh |
-| `npm run typecheck` | TypeScript type check |
-| `npm run lint` | Lint placeholder |
 | `./scripts/build-release.sh` | Build 6 artefak rilis |
 | `./scripts/generate-release-notes.sh` | Generate release notes adaptive |
 | `./scripts/build-install-guide.sh` | Generate panduan instalasi lengkap |
