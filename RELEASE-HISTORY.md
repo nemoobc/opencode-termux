@@ -2,6 +2,22 @@
 
 ---
 
+# v1.20.15 (2026-09-21)
+Upstream: opencode v2.0.11
+
+- **Koreksi teori patchelf**: invoke binary via loader langsung
+  (`ld-musl.so --library-path vendor opencode`) ternyata merusak
+  `/proc/self/exe` sehingga re-exec background server gagal
+  (`cannot load serve`) dan TUI tidak bisa start. `patchelf
+  --set-interpreter/--set-rpath` 0.18.0 terbukti aman untuk binary 200MB+
+  (terverifikasi di Termux arm64: `--version` + TUI jalan). Wrapper kini exec
+  langsung dengan fallback loader, installer patch saat native.
+- **Cross-build**: rakit bundle arm64 di runner x64 melewati patch (loader
+  target tak bisa dieksekusi di host) — bundle di-patch otomatis saat
+  first-run di perangkat (`ensurePatched`, selalu native, idempoten).
+- **FIX CI e2e-x64**: job kekurangan `OCX_FORCE=1` + `OCX_ARCH=x64` sehingga
+  install dilewati dan vendor tak terbentuk. Detektor baru mengunci keduanya.
+
 # v1.20.14 (2026-09-20)
 Upstream: opencode v2.0.11
 

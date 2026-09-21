@@ -243,6 +243,16 @@ t("versi: RELEASE-HISTORY memuat entry versi paket terbaru", () => {
   const p = json("package.json")
   ok(read("RELEASE-HISTORY.md").includes(`# v${p.version}`), `entry '# v${p.version}' hilang dari RELEASE-HISTORY.md`)
 })
+t("install: patch PT_INTERP hanya saat native (cross-build dilewati)", () => {
+  const s = read("install.mjs")
+  ok(/cross-build/.test(s), "penanda cross-build hilang — build rilis arm64 di runner x64 akan gagal")
+  ok(/process\.arch/.test(s), "deteksi arch host hilang")
+})
+t("self-heal: wrapper patch PT_INTERP saat bundle cross-build", () => {
+  const b = read("bin/opencode-termux.js")
+  ok(/ensurePatched/.test(b), "ensurePatched hilang — bundle cross-build TUI-nya mati")
+  ok(/--set-interpreter/.test(b), "pemanggilan patchelf hilang dari wrapper")
+})
 t("vendor: symlink libc.musl-*.so.1 → ld-musl.so ada (DT_NEEDED terpenuhi)", () => {
   if (!fs.existsSync(path.join(root, "vendor"))) return // vendor hanya ada setelah install
   const libc = fs.readdirSync(path.join(root, "vendor")).find(f => f.startsWith("libc.musl-"))

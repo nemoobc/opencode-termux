@@ -90,6 +90,38 @@ function runOc(args, opts) {
   return spawnSync(loader, ["--library-path", vendor, bin, ...args], opts)
 }
 
+// True bila string PT_INTERP binary sudah menunjuk loader vendor lokal.
+// .interp selalu di awal file → cukup baca 8KB pertama (murah, tiap run).
+function interpPatched() {
+  try {
+    const fd = fs.openSync(bin, "r")
+    const buf = Buffer.alloc(8192)
+    fs.readSync(fd, buf, 0, 8192, 0)
+    fs.closeSync(fd)
+    return buf.includes(path.join(vendor, "ld-musl.so"))
+  } catch { return false }
+}
+
+// Bundle hasil cross-build (rakit arm64 di host x64) datang belum di-patch
+// (install.mjs melewati patch saat cross). Patch di sini selalu native
+// (jalan di perangkat target) sehingga aman. Idempoten: sekali saja.
+function ensurePatched() {
+  if (!ready() || interpPatched()) return true
+  const patcher = path.join(vendor, "patchelf")
+  if (!fs.existsSync(patcher)) return false
+  console.log("[opencode-termux] patch PT_INTERP/RPATH ke vendor lokal…")
+  const env = cleanEnv()
+  const r = spawnSync(loader,
+    ["--library-path", vendor, patcher,
+      "--set-interpreter", loader, "--set-rpath", vendor, bin],
+    { stdio: "ignore", env })
+  if (r.error || r.status !== 0 || !interpPatched()) {
+    console.error("[opencode-termux] patch gagal — perintah sekali-jalan tetap bisa, TUI butuh binary ter-patch.")
+    return false
+  }
+  return true
+}
+
 function runBinary(args) {
   ensureTmp()
   ensureDns()
@@ -226,6 +258,7 @@ pakai:
     process.exit(0)
   }
   if (!heal()) process.exit(1)
+  ensurePatched()
   process.exit(runBinary(process.argv.slice(2)))
 }
 

@@ -151,23 +151,33 @@ try {
     log(`symlink ${libcName} → ld-musl.so`)
   }
 
-  // 3c) patch PT_INTERP + RPATH ke vendor lokal.
+  // 3c) patch PT_INTERP + RPATH ke vendor lokal — HANYA saat native.
   //     Tanpa ini binary hanya bisa di-invoke via loader
   //     (ld-musl.so --library-path vendor opencode) — tapi mode itu merusak
   //     /proc/self/exe sehingga re-exec background server gagal
   //     ("cannot load serve") dan TUI tidak bisa start.
   //     patchelf 0.18.0 aman untuk binary ini
   //     (terverifikasi di Termux arm64: --version + TUI jalan).
+  //     Cross-build (host ≠ target, mis. rakit bundle arm64 di runner x64)
+  //     patch-nya DILEWATI — loader/patchelf target tak bisa dieksekusi di
+  //     host; bundle di-patch otomatis saat first-run di perangkat
+  //     (ensurePatched di bin/opencode-termux.js, selalu native).
   {
-    const loaderBin = path.join(vendor, "ld-musl.so")
-    const ocBin = path.join(vendor, "opencode")
-    const patcher = path.join(vendor, "patchelf")
-    const { LD_PRELOAD, LD_PRELOAD_32BIT, ...noPreload } = process.env
-    log("patch PT_INTERP/RPATH ke vendor lokal…")
-    execFileSync(loaderBin,
-      ["--library-path", vendor, patcher,
-        "--set-interpreter", loaderBin, "--set-rpath", vendor, ocBin],
-      { stdio: "ignore", env: noPreload })
+    const targetArch = ARCH === "x64" ? "x64" : "arm64"
+    const hostArch = process.arch === "arm64" ? "arm64" : "x64"
+    if (targetArch !== hostArch) {
+      log(`patch PT_INTERP dilewati (cross-build ${hostArch}→${targetArch} — di-patch saat first-run di perangkat)`)
+    } else {
+      const loaderBin = path.join(vendor, "ld-musl.so")
+      const ocBin = path.join(vendor, "opencode")
+      const patcher = path.join(vendor, "patchelf")
+      const { LD_PRELOAD, LD_PRELOAD_32BIT, ...noPreload } = process.env
+      log("patch PT_INTERP/RPATH ke vendor lokal…")
+      execFileSync(loaderBin,
+        ["--library-path", vendor, patcher,
+          "--set-interpreter", loaderBin, "--set-rpath", vendor, ocBin],
+        { stdio: "ignore", env: noPreload })
+    }
   }
 
   // 4) siapkan DNS config di prefix Termux (bisa ditulis TANPA root)
