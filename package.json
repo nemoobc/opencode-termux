@@ -1,6 +1,6 @@
 {
   "name": "@nemoobc/opencode-termux",
-  "version": "1.20.14",
+  "version": "1.20.15",
   "description": "opencode CLI native untuk Termux/Android tanpa proot — membundel binary opencode resmi (upstream opencode 2.2.0) + patch ELF biar jalan native",
   "type": "module",
   "bin": {

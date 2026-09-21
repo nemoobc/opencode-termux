@@ -2,6 +2,17 @@
 
 ---
 
+# v1.20.15 (2026-09-21)
+Upstream: opencode v2.0.11
+
+- **FIX TUI final**: patch `PT_INTERP` saja (interp-only, **tanpa RPATH**).
+  Matriks uji membuktikan `--set-rpath` = SIGSEGV (binary 195MB jadi sampah
+  bahkan via loader), sementara interp-only + `LD_LIBRARY_PATH` = jalan
+  (`v2.0.11` + TUI render, 0× cannot-load-serve — terbukti di Termux arm64
+  dan sandbox x64). Patch saat install bila native, atau first-run di
+  perangkat (`ensurePatched`, idempoten). Wrapper exec langsung + fallback
+  loader; auto-stop server tetap jalan.
+
 # v1.20.14 (2026-09-20)
 Upstream: opencode v2.0.11
 
