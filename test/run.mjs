@@ -243,15 +243,15 @@ t("versi: RELEASE-HISTORY memuat entry versi paket terbaru", () => {
   const p = json("package.json")
   ok(read("RELEASE-HISTORY.md").includes(`# v${p.version}`), `entry '# v${p.version}' hilang dari RELEASE-HISTORY.md`)
 })
-t("install: patch PT_INTERP hanya saat native (cross-build dilewati)", () => {
-  const s = read("install.mjs")
-  ok(/cross-build/.test(s), "penanda cross-build hilang — build rilis arm64 di runner x64 akan gagal")
-  ok(/process\.arch/.test(s), "deteksi arch host hilang")
+t("install: tanpa patch ELF — invoke via loader, patchelf dilarang", () => {
+  const code = read("install.mjs").split("\n").filter(l => !l.trim().startsWith("//")).join("\n")
+  ok(!/--set-interpreter/.test(code), "patch ELF kembali — patchelf corrupt binary 200MB+ (SIGSEGV)")
+  ok(/--library-path/.test(code), "invoke via loader hilang dari smoke test")
 })
-t("self-heal: wrapper patch PT_INTERP saat bundle cross-build", () => {
+t("wrapper: server dinyalakan eksplisit sebelum TUI (anti cannot-load-serve)", () => {
   const b = read("bin/opencode-termux.js")
-  ok(/ensurePatched/.test(b), "ensurePatched hilang — bundle cross-build TUI-nya mati")
-  ok(/--set-interpreter/.test(b), "pemanggilan patchelf hilang dari wrapper")
+  ok(/ensureServer/.test(b), "ensureServer hilang — TUI via loader gagal re-exec server")
+  ok(/"service", "start"/.test(b), "penyalaan server eksplisit hilang dari wrapper")
 })
 t("vendor: symlink libc.musl-*.so.1 → ld-musl.so ada (DT_NEEDED terpenuhi)", () => {
   if (!fs.existsSync(path.join(root, "vendor"))) return // vendor hanya ada setelah install

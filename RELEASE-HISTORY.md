@@ -2,22 +2,6 @@
 
 ---
 
-# v1.20.15 (2026-09-21)
-Upstream: opencode v2.0.11
-
-- **Koreksi teori patchelf**: invoke binary via loader langsung
-  (`ld-musl.so --library-path vendor opencode`) ternyata merusak
-  `/proc/self/exe` sehingga re-exec background server gagal
-  (`cannot load serve`) dan TUI tidak bisa start. `patchelf
-  --set-interpreter/--set-rpath` 0.18.0 terbukti aman untuk binary 200MB+
-  (terverifikasi di Termux arm64: `--version` + TUI jalan). Wrapper kini exec
-  langsung dengan fallback loader, installer patch saat native.
-- **Cross-build**: rakit bundle arm64 di runner x64 melewati patch (loader
-  target tak bisa dieksekusi di host) — bundle di-patch otomatis saat
-  first-run di perangkat (`ensurePatched`, selalu native, idempoten).
-- **FIX CI e2e-x64**: job kekurangan `OCX_FORCE=1` + `OCX_ARCH=x64` sehingga
-  install dilewati dan vendor tak terbentuk. Detektor baru mengunci keduanya.
-
 # v1.20.14 (2026-09-20)
 Upstream: opencode v2.0.11
 
@@ -29,14 +13,18 @@ Upstream: opencode v2.0.11
   men-downgrade pin upstream ke opencode-ai v1 (bug: selalu mengambil latest
   dari registry npm walau paket ini mode opencode v2). Kini versi v2 terbaru
   diambil dari listing opencode.ai dan pin **hanya naik** (cmpVer).
-- **FIX patchelf corruption**: `patchelf --set-interpreter` dengan path absolut
-  panjang menambah PT_INTERP segment baru → memindahkan offset → binary 200MB+
-  SIGSEGV. Fix: semua invokasi binary sekarang via loader langsung
-  (`ld-musl.so --library-path vendor opencode`) — PT_INTERP tidak diperlukan.
+- **FIX TUI cannot-load-serve**: invoke binary via loader langsung merusak
+  `/proc/self/exe` sehingga re-exec background server gagal dan TUI tidak
+  start. Binary TIDAK di-patch (`patchelf --set-interpreter` terbukti
+  merusakkan binary 200MB+ → SIGSEGV bahkan via loader). Solusi: wrapper
+  menyalakan server eksplisit via loader SEBELUM TUI jalan (`ensureServer`),
+  TUI menemukan server hidup dan tak perlu re-exec. Auto-stop setelah exit
+  tetap jalan (hemat RAM/baterai).
   Symlink `libc.musl-*.so.1 → ld-musl.so` ditambah untuk memenuhi DT_NEEDED.
-  E2E x64 kini hijau (39/39).
 - **FIX args spread**: `spawnSync(loader, [..., args])` → args jadi nested
   array, binary terima empty string → `chdir("")` gagal. Fix: `...args` (spread).
+- **FIX CI e2e-x64**: job kekurangan `OCX_FORCE=1` + `OCX_ARCH=x64` sehingga
+  install dilewati dan vendor tak terbentuk. Detektor baru mengunci keduanya.
 
 # v1.20.12 (2026-09-20)
 Upstream: opencode v2.0.6

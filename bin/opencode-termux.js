@@ -81,42 +81,25 @@ function ensureTmp() {
 }
 
 function runOc(args, opts) {
-  // Exec langsung dulu (binary sudah di-patch PT_INTERP saat install) —
-  // re-exec background server butuh /proc/self/exe = binary opencode.
-  // Fallback ke invoke via loader untuk vendor lama yang belum di-patch
-  // (fallback cukup untuk perintah sekali-jalan seperti --version).
-  const direct = spawnSync(bin, args, opts)
-  if (!direct.error) return direct
+  // SELALU invoke via loader langsung (binary tak pernah di-patch —
+  // patchelf corrupt binary 200MB+ → SIGSEGV, terbukti di runner x64).
+  // Loader di-invoke sebagai interpreter langsung:
+  // ld-musl.so --library-path vendor opencode.
   return spawnSync(loader, ["--library-path", vendor, bin, ...args], opts)
 }
 
-// True bila string PT_INTERP binary sudah menunjuk loader vendor lokal.
-// .interp selalu di awal file → cukup baca 8KB pertama (murah, tiap run).
-function interpPatched() {
-  try {
-    const fd = fs.openSync(bin, "r")
-    const buf = Buffer.alloc(8192)
-    fs.readSync(fd, buf, 0, 8192, 0)
-    fs.closeSync(fd)
-    return buf.includes(path.join(vendor, "ld-musl.so"))
-  } catch { return false }
-}
-
-// Bundle hasil cross-build (rakit arm64 di host x64) datang belum di-patch
-// (install.mjs melewati patch saat cross). Patch di sini selalu native
-// (jalan di perangkat target) sehingga aman. Idempoten: sekali saja.
-function ensurePatched() {
-  if (!ready() || interpPatched()) return true
-  const patcher = path.join(vendor, "patchelf")
-  if (!fs.existsSync(patcher)) return false
-  console.log("[opencode-termux] patch PT_INTERP/RPATH ke vendor lokal…")
-  const env = cleanEnv()
-  const r = spawnSync(loader,
-    ["--library-path", vendor, patcher,
-      "--set-interpreter", loader, "--set-rpath", vendor, bin],
-    { stdio: "ignore", env })
-  if (r.error || r.status !== 0 || !interpPatched()) {
-    console.error("[opencode-termux] patch gagal — perintah sekali-jalan tetap bisa, TUI butuh binary ter-patch.")
+// TUI butuh background server, tapi server yang di-spawn TUI via re-exec
+// dirinya sendiri gagal saat invoke via loader (/proc/self/exe = loader
+// → "cannot load serve"). Solusi: wrapper menyalakan server eksplisit
+// SEBELUM TUI jalan — TUI menemukan server sudah hidup dan tak perlu re-exec.
+// Mengembalikan true bila server sudah/harus dimatikan wrapper saat exit.
+function ensureServer(env) {
+  const s = runOc(["service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"], timeout: 15000 })
+  if (!s.error && s.status === 0 && (s.stdout || "").trim() !== "stopped") return false
+  console.log("[opencode-termux] menyalakan background server…")
+  const r = runOc(["service", "start"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"], timeout: 60000 })
+  if (r.error || r.status !== 0) {
+    console.error("[opencode-termux] server gagal dinyalakan — TUI mungkin gagal start.")
     return false
   }
   return true
@@ -127,16 +110,11 @@ function runBinary(args) {
   ensureDns()
   const env = cleanEnv()
   const interactive = args.length === 0 || args[0] === "mini"
-  let serverWasRunning = false
-  if (interactive) {
-    const s = runOc(["service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"] })
-    serverWasRunning = !s.error && s.status === 0 && (s.stdout || "").trim() !== "stopped"
-  }
-  // Exec langsung (bukan via loader): invoke via loader merusak /proc/self/exe
-  // sehingga re-exec server gagal ("cannot load serve") dan TUI tidak start.
+  let stopServer = false
+  if (interactive) stopServer = ensureServer(env)
   const r = runOc(args, { stdio: "inherit", env })
-  if (interactive && !serverWasRunning) {
-    runOc(["service", "stop"], { stdio: "ignore", env })
+  if (interactive && stopServer) {
+    runOc(["service", "stop"], { stdio: "ignore", env, timeout: 15000 })
   }
   if (r.error) {
     console.error("[opencode-termux] gagal menjalankan binary:", r.error.message)
@@ -258,7 +236,6 @@ pakai:
     process.exit(0)
   }
   if (!heal()) process.exit(1)
-  ensurePatched()
   process.exit(runBinary(process.argv.slice(2)))
 }
 
