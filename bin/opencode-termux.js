@@ -80,6 +80,16 @@ function ensureTmp() {
   process.env.TMPDIR = t
 }
 
+function runOc(args, opts) {
+  // Exec langsung dulu (binary sudah di-patch PT_INTERP saat install) —
+  // re-exec background server butuh /proc/self/exe = binary opencode.
+  // Fallback ke invoke via loader untuk vendor lama yang belum di-patch
+  // (fallback cukup untuk perintah sekali-jalan seperti --version).
+  const direct = spawnSync(bin, args, opts)
+  if (!direct.error) return direct
+  return spawnSync(loader, ["--library-path", vendor, bin, ...args], opts)
+}
+
 function runBinary(args) {
   ensureTmp()
   ensureDns()
@@ -87,15 +97,14 @@ function runBinary(args) {
   const interactive = args.length === 0 || args[0] === "mini"
   let serverWasRunning = false
   if (interactive) {
-    const s = spawnSync(loader, ["--library-path", vendor, bin, "service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"] })
-    serverWasRunning = s.status === 0 && s.stdout.trim() !== "stopped"
+    const s = runOc(["service", "status"], { encoding: "utf8", env, stdio: ["ignore", "pipe", "ignore"] })
+    serverWasRunning = !s.error && s.status === 0 && (s.stdout || "").trim() !== "stopped"
   }
-  // Invoke via loader langsung (bukan binary patched) — patchelf --set-interpreter
-  // merusakkan binary 200MB+ (menambah PT_INTERP segment, memindahkan offset → SIGSEGV).
-  // Loader di-invoke sebagai interpreter langsung: ld-musl.so --library-path vendor opencode.
-  const r = spawnSync(loader, ["--library-path", vendor, bin, ...args], { stdio: "inherit", env })
+  // Exec langsung (bukan via loader): invoke via loader merusak /proc/self/exe
+  // sehingga re-exec server gagal ("cannot load serve") dan TUI tidak start.
+  const r = runOc(args, { stdio: "inherit", env })
   if (interactive && !serverWasRunning) {
-    spawnSync(loader, ["--library-path", vendor, bin, "service", "stop"], { stdio: "ignore", env })
+    runOc(["service", "stop"], { stdio: "ignore", env })
   }
   if (r.error) {
     console.error("[opencode-termux] gagal menjalankan binary:", r.error.message)
@@ -177,11 +186,11 @@ function cmdDoctor() {
   })
   cek("binary opencode", () => {
     if (!ready()) throw new Error("binary belum terpasang")
-    const out = spawnSync(loader, ["--library-path", vendor, bin, "--version"], {
+    const out = runOc(["--version"], {
       encoding: "utf8",
       env: cleanEnv(),
     })
-    if (out.status !== 0) throw new Error("gagal dieksekusi")
+    if (out.error || out.status !== 0) throw new Error("gagal dieksekusi")
     return `v${out.stdout.trim()}`
   })
 
@@ -192,11 +201,11 @@ function cmdDoctor() {
 function cmdVersion() {
   let binVer = "(belum terpasang)"
   if (ready()) {
-    const out = spawnSync(loader, ["--library-path", vendor, bin, "--version"], {
+    const out = runOc(["--version"], {
       encoding: "utf8",
       env: cleanEnv(),
     })
-    if (out.status === 0 && out.stdout.trim()) binVer = out.stdout.trim()
+    if (!out.error && out.status === 0 && out.stdout.trim()) binVer = out.stdout.trim()
   }
   console.log(`opencode-termux v${PKG.version} (upstream opencode ${PKG.opencodeUpstream}, binary ${binVer})`)
   return 0

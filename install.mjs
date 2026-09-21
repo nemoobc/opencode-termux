@@ -151,10 +151,24 @@ try {
     log(`symlink ${libcName} → ld-musl.so`)
   }
 
-  // 3c) patchelf DILARANG untuk binary besar (200MB+) — patchelf --set-interpreter
-  //     menambah PT_INTERP segment baru, memindahkan offset, dan MERUSAKKAN binary
-  //     (SIGSEGV). Solusi: bin/opencode-termux.js invoke binary VIA loader langsung
-  //     (ld-musl.so --library-path vendor opencode), sehingga PT_INTERP tidak diperlukan.
+  // 3c) patch PT_INTERP + RPATH ke vendor lokal.
+  //     Tanpa ini binary hanya bisa di-invoke via loader
+  //     (ld-musl.so --library-path vendor opencode) — tapi mode itu merusak
+  //     /proc/self/exe sehingga re-exec background server gagal
+  //     ("cannot load serve") dan TUI tidak bisa start.
+  //     patchelf 0.18.0 aman untuk binary ini
+  //     (terverifikasi di Termux arm64: --version + TUI jalan).
+  {
+    const loaderBin = path.join(vendor, "ld-musl.so")
+    const ocBin = path.join(vendor, "opencode")
+    const patcher = path.join(vendor, "patchelf")
+    const { LD_PRELOAD, LD_PRELOAD_32BIT, ...noPreload } = process.env
+    log("patch PT_INTERP/RPATH ke vendor lokal…")
+    execFileSync(loaderBin,
+      ["--library-path", vendor, patcher,
+        "--set-interpreter", loaderBin, "--set-rpath", vendor, ocBin],
+      { stdio: "ignore", env: noPreload })
+  }
 
   // 4) siapkan DNS config di prefix Termux (bisa ditulis TANPA root)
   function ensureEtc() {
@@ -173,16 +187,17 @@ try {
   }
   ensureEtc()
 
-  // 5) smoke test — invoke via loader langsung (bukan binary patched, karena
-  //     patchelf corrupt binary 200MB+)
+  // 5) smoke test — binary langsung (sudah di-patch PT_INTERP di 3c).
+  //     Invoke via loader (ld-musl.so --library-path vendor opencode) hanya
+  //     untuk perintah sekali-jalan; TUI butuh exec langsung agar re-exec
+  //     background server ikut jalan.
   if (process.env.OCX_SKIP_SMOKE === "1") {
     log("smoke test dilewati (OCX_SKIP_SMOKE=1 — mode cross-build)")
   } else {
     log("smoke test…")
     const { LD_PRELOAD, LD_PRELOAD_32BIT, ...cleanEnv } = process.env
-    execFileSync(path.join(vendor, "ld-musl.so"),
-      ["--library-path", vendor, path.join(vendor, "opencode"), "--version"],
-      { stdio: "inherit", env: { ...cleanEnv, LD_LIBRARY_PATH: vendor } })
+    execFileSync(path.join(vendor, "opencode"), ["--version"],
+      { stdio: "inherit", env: cleanEnv })
   }
 
   // 6) auto-install config opencode (tanpa menimpa milik user)
