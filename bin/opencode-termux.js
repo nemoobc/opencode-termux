@@ -32,26 +32,6 @@ function heal() {
   return true
 }
 
-// Bandingkan versi semver: return 1 (a>b), -1 (a<b), 0 (sama)
-function cmpVer(a, b) {
-  const pa = a.split(".").map(Number), pb = b.split(".").map(Number)
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) > (pb[i] || 0)) return 1
-    if ((pa[i] || 0) < (pb[i] || 0)) return -1
-  }
-  return 0
-}
-
-// Ambil versi terbaru dari npm registry (mode v2 pakai @opencode/cli)
-async function latestUpstream() {
-  try {
-    const reg = PKG.opencodeUpstream?.startsWith("2.") ? "@opencode/cli" : "opencode-ai"
-    const res = await fetch(`https://registry.npmjs.org/${reg}/latest`)
-    if (res.ok) { const d = await res.json(); if (d.version) return d.version }
-  } catch {}
-  return null
-}
-
 // DNS fix: musl hasil build kita membaca config dari prefix Termux —
 // pastikan filenya ada (bisa ditulis tanpa root).
 function ensureDns() {
@@ -152,27 +132,22 @@ function runBinary(args) {
 }
 
 async function cmdUpdate() {
-  console.log(`[opencode-termux] memperbarui bundle (paket v${PKG.version})…`)
+  console.log("[opencode-termux] update via npm — npm install -g @nemoobc/opencode-termux@latest")
   const env = { ...process.env }
   delete env.LD_PRELOAD
   delete env.LD_PRELOAD_32BIT
-  const r = spawnSync(process.execPath, [path.join(root, "install.mjs")], {
+  const r = spawnSync("npm", ["install", "-g", "@nemoobc/opencode-termux@latest"], {
     stdio: "inherit",
     env: env,
   })
-  if (r.status !== 0) {
+  if (r.error || r.status !== 0) {
     console.error("[opencode-termux] ❌ update gagal.")
+    console.error("Kalau npm memblokir script postinstall (allow-scripts), jalankan dulu:")
+    console.error("  npm config set allow-scripts=@nemoobc/opencode-termux --location=user")
+    console.error("  npm rebuild -g @nemoobc/opencode-termux")
     return 1
   }
-  // sinkronkan pin di package.json modul agar auto-heal berikutnya konsisten
-  try {
-    const latest = await latestUpstream()
-    if (latest && cmpVer(latest, PKG.opencodeUpstream) > 0) {
-      PKG.opencodeUpstream = latest
-      fs.writeFileSync(path.join(root, "package.json"), JSON.stringify(PKG, null, 2) + "\n")
-    }
-  } catch {}
-  console.log("[opencode-termux] ✅ update selesai.")
+  console.log("[opencode-termux] ✅ update selesai — cek dengan 'opencode-termux version'.")
   return 0
 }
 
@@ -248,19 +223,40 @@ function cmdVersion() {
   return 0
 }
 
+// Perintah-perintah yang SAH sebagai argumen pertama opencode (selain path/folder
+// project). Argumen bareword lain yang bukan path = salah ketik → tolak ramah,
+// supaya tidak jatuh ke chdir ENOENT yang membingungkan dari binary opencode.
+const KNOWN_ARGS = new Set([
+  "mini", "run", "serve", "auth", "agents", "agent", "models", "debug",
+  "uninstall", "reset", "telemetry", "open", "restore", "menu",
+])
+
+function looksLikePath(a) {
+  return a.includes("/") || a === "." || a === ".." || fs.existsSync(a)
+}
+
+function looksLikeFlag(a) {
+  return a.startsWith("-")
+}
+
 async function main() {
   const arg = process.argv[2]
-  if (arg === "update") process.exit(await cmdUpdate())
+  if (arg === "update" || arg === "upgrade") process.exit(await cmdUpdate())
   if (arg === "doctor") process.exit(cmdDoctor())
   if (arg === "version") process.exit(cmdVersion())
   if (arg === "help" || arg === "--help" || arg === "-h") {
     console.log(`opencode-termux v${PKG.version}
 pakai:
-  opencode-termux                 jalankan CLI opencode (argumen diteruskan)
-  opencode-termux update          perbarui binary ke upstream terbaru
-  opencode-termux doctor          diagnosis lingkungan & bundle
-  opencode-termux version         info versi paket + binary`)
+  opencode-termux [opsi/path]      jalankan CLI opencode (argumen diteruskan)
+  opencode-termux update           update via npm: npm install -g @nemoobc/opencode-termux
+  opencode-termux doctor           diagnosis lingkungan & bundle
+  opencode-termux version          info versi paket + binary`)
     process.exit(0)
+  }
+  if (arg !== undefined && !looksLikeFlag(arg) && !looksLikePath(arg) && !KNOWN_ARGS.has(arg)) {
+    console.error(`[opencode-termux] perintah tidak dikenal: '${arg}'`)
+    console.error("Cek daftar perintah: 'opencode-termux help' — atau beri path folder project yang valid.")
+    process.exit(1)
   }
   if (!heal()) process.exit(1)
   process.exit(runBinary(process.argv.slice(2)))

@@ -43,17 +43,22 @@ Paket ini **tidak** membundel agent, command, atau skill opencode — biar
 lingkungan kamu bersih dan bebas konflik dengan setup sendiri. Kalau butuh,
 pasang manual di `~/.config/opencode/`.
 
+> `commands/` di repo ini berisi **override opsional** (tidak ikut di
+> package.json `files[]`). Contoh: `commands/update.md` mengarahkan `/update`
+> di TUI ke update npm — salin manual ke `~/.config/opencode/commands/`
+> kalau mau dipakai.
+
 **Config default ikut terpasang:** model `opencode/big-pickle` — **tanpa API key**.
 
 ---
 
 ## 🔄 **Sync Upstream Otomatis**
 
-Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) baru setiap **6 jam** — begitu ada versi baru, paket ini otomatis menyesuaikan:
+Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) baru setiap **bulan** — begitu ada versi baru, paket ini otomatis menyesuaikan:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  sync-upstream.yml (cron 0 */6 * * *)                        │
+│  sync-upstream.yml (cron 0 0 1 * *)                         │
 ├─────────────────────────────────────────────────────────────┤
 │  1. Cek npm registry @opencode/cli (v2)                       │
 │  2. Bump opencodeUpstream + version patch                     │
@@ -65,6 +70,27 @@ Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) ba
 ```
 
 **Commit memakai identitas nemoobc** — riwayat bersih, traceable.
+
+---
+
+## ⬆️ **Update (method: npm)**
+
+Satu-satunya jalur update resmi di Termux — dipakai oleh
+`opencode-termux update` dan alias `opencode-termux upgrade`:
+
+```bash
+npm install -g @nemoobc/opencode-termux@latest
+# atau:
+opencode-termux update
+```
+
+> ℹ️ **`/update` di TUI opencode** adalah command bawaan upstream (`upgrade`)
+> yang menargetkan rilis `@opencode/cli` — di Termux selalu gagal
+> `Installation method not found`, karena detektor npm-nya tak mengenali
+> `@nemoobc/opencode-termux`. Repo ini menyediakan override **opsional**
+> `commands/update.md` (tidak ikut bundel npm) yang mengarahkan `/update`
+> ke perintah npm di atas — salin ke `~/.config/opencode/commands/` untuk
+> memakainya.
 
 ---
 
@@ -186,7 +212,7 @@ pkg install ./opencode-termux_{v}_aarch64.deb
 opencode-termux --version   # Versi binary upstream
 opencode-termux doctor      # Diagnosis lengkap environment
 opencode-termux version     # Info versi paket + binary
-opencode-termux update      # Update binary ke upstream terbaru
+opencode-termux update      # Update via npm: npm install -g @nemoobc/opencode-termux
 ```
 
 **Doctor output interpretation:**
@@ -299,7 +325,7 @@ ls -la dist/
 
 ### 🔄 Alur Rilis Otomatis (kendali tunggal: `sync-upstream`)
 
-Satu-satunya mekanisme yang menaikkan versi & menerbitkan rilis adalah workflow **`sync-upstream`** (otomatis tiap 6 jam + bisa manual via `workflow_dispatch`):
+Satu-satunya mekanisme yang menaikkan versi & menerbitkan rilis adalah workflow **`sync-upstream`** (otomatis tiap bulan + bisa manual via `workflow_dispatch`):
 
 1. Cek versi terbaru **`opencode-ai`** di npm.
 2. Berbeda dari `opencodeUpstream`? → naikkan `opencodeUpstream` + versi paket, commit + tag `vX.Y.Z`.
