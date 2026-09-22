@@ -43,10 +43,9 @@ Paket ini **tidak** membundel agent, command, atau skill opencode — biar
 lingkungan kamu bersih dan bebas konflik dengan setup sendiri. Kalau butuh,
 pasang manual di `~/.config/opencode/`.
 
-> `commands/` di repo ini berisi **override opsional** (tidak ikut di
-> package.json `files[]`). Contoh: `commands/update.md` mengarahkan `/update`
-> di TUI ke update npm — salin manual ke `~/.config/opencode/commands/`
-> kalau mau dipakai.
+> `commands/` tidak ikut di package.json `files[]` — repo ini tidak punya
+> command tambahan; `/update` di TUI ditangani langsung oleh wrapper (lihat
+> bagian **Update**).
 
 **Config default ikut terpasang:** model `opencode/big-pickle` — **tanpa API key**.
 
@@ -87,10 +86,12 @@ opencode-termux update
 > ℹ️ **`/update` di TUI opencode** adalah command bawaan upstream (`upgrade`)
 > yang menargetkan rilis `@opencode/cli` — di Termux selalu gagal
 > `Installation method not found`, karena detektor npm-nya tak mengenali
-> `@nemoobc/opencode-termux`. Repo ini menyediakan override **opsional**
-> `commands/update.md` (tidak ikut bundel npm) yang mengarahkan `/update`
-> ke perintah npm di atas — salin ke `~/.config/opencode/commands/` untuk
-> memakainya.
+> `@nemoobc/opencode-termux`. Wrapper mem-patch pesan error bawaan itu di
+> binary vendor: saat kamu buka `/update`, kamu melihat
+> **`Update via npm: npm install -g @nemoobc/opencode-termux`** sebagai
+> penunjuk. Patch ini idempoten (rekam mtime di `vendor/.msg-patched`) dan
+> otomatis diulang tiap binary vendor berganti (update npm / sync upstream).
+> Eksekusinya tetap dari terminal: `opencode-termux update`.
 
 ---
 

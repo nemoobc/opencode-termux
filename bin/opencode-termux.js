@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/data/data/com.termux/files/usr/bin/env node
 import { spawnSync } from "child_process"
 import fs from "fs"
 import path from "path"
@@ -108,10 +108,57 @@ function ensurePatched() {
   return true;
 }
 
+// Logika /update bawaan ter-compile di binary (deteksi metode + target dari
+// API opencode.ai) — tidak bisa diarahkan ke npm @nemoobc/opencode-termux.
+// Yang bisa diubah: teks errornya. Ganti pesan "installation method not found"
+// → tunjuk cara update yang benar. Idempoten; hanya jalan saat vendor/opencode
+// BARU (mtime berubah) — marker mtime menghindari scan 195MB setiap run.
+const MSG_PATCHES = [
+  ["Could not detect the installation method. Pass --method to choose how to upgrade OpenCode.",
+   "Update via npm: npm install -g @nemoobc/opencode-termux"],
+  ["Installation method not found",
+   "Update via npm (paket termux)"],
+  ["update skipped: installation method not found",
+   "update: npm i -g @nemoobc/opencode-termux"],
+];
+const MSG_MARKER = path.join(vendor, ".msg-patched");
+
+function patchUpdateMsg() {
+  if (!ready()) return;
+  try {
+    const st = fs.statSync(bin);
+    let prev = "";
+    try { prev = fs.readFileSync(MSG_MARKER, "utf8").trim(); } catch {}
+    if (prev === String(st.mtimeMs)) return;
+
+    // latin1 = pemetaan 1 byte → 1 char, lossless untuk seluruh file biner.
+    let out = fs.readFileSync(bin).toString("latin1");
+    let changed = false;
+    for (const [needle, rep] of MSG_PATCHES) {
+      const full = rep + " ".repeat(needle.length - rep.length); // panjang sama → offset blob aman
+      if (full.length !== needle.length || !out.includes(needle)) continue;
+      let n = 0;
+      while (out.includes(needle)) { out = out.replace(needle, full); n++; }
+      changed = true;
+      console.log(`[opencode-termux] pesan /update dipatch ${n}x → ${rep}`);
+    }
+    if (changed) {
+      const tmp = bin + ".msgpatched";
+      fs.writeFileSync(tmp, Buffer.from(out, "latin1"));
+      fs.renameSync(tmp, bin);
+      fs.chmodSync(bin, 0o755); // pertahankan executable bit
+    }
+    fs.writeFileSync(MSG_MARKER, String(st.mtimeMs));
+  } catch (e) {
+    console.error("[opencode-termux] patch pesan /update dilewati:", e.message);
+  }
+}
+
 function runBinary(args) {
   ensureTmp();
   ensureDns();
   ensurePatched();
+  patchUpdateMsg();
   const env = ocEnv();
   const interactive = args.length === 0 || args[0] === "mini";
   let serverWasRunning = false;
