@@ -43,6 +43,7 @@ PREF_TMP="${TMPDIR:-${PREFIX:-/data/data/com.termux/files/usr}/tmp}"
 mkdir -p "$PREF_TMP" 2>/dev/null || PREF_TMP="$(pwd)/.ocx-tmp"
 WORK="$PREF_TMP/ocx-install-$$"
 mkdir -p "$WORK"
+trap 'rm -rf "$WORK" "$LIBDIR.new"' EXIT
 
 fetch() { # fetch <url> <dest>
   if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"
@@ -59,19 +60,61 @@ else
     || die "unduhan gagal & tidak ada bundle offline di samping installer"
 fi
 
-# ---- pasang -------------------------------------------------------------
+# ---- pasang (staging + swap: instalasi lama tak tersentuh sampai smoke lolos)
 say "memasang ke $LIBDIR…"
-mkdir -p "$LIBDIR" "$BINDIR"
-tar xzf "$WORK/bundle.tar.gz" -C "$LIBDIR" --strip-components=1
+mkdir -p "$BINDIR"
+rm -rf "$LIBDIR.new"
+mkdir -p "$LIBDIR.new"
+tar xzf "$WORK/bundle.tar.gz" -C "$LIBDIR.new" --strip-components=1
+
+VENDOR="$LIBDIR/vendor"
+OC="$VENDOR/opencode"
+LOADER="$VENDOR/ld-musl.so"
+PATCHER="$VENDOR/patchelf"
+MARK="$LIBDIR/.interp-patched"
+
+# swap: LIBDIR lama dipindah ke .old (rollback bila smoke gagal)
+rm -rf "$LIBDIR.old"
+if [ -e "$LIBDIR" ]; then mv "$LIBDIR" "$LIBDIR.old"; fi
+mv "$LIBDIR.new" "$LIBDIR"
+
+# ---- first-run patch PT_INTERP (bundle rilis di-cross-build di CI) ------
+# Bundle menyimpan binary dengan INTERP bawaan (/lib/ld-musl-*.so.1 — tak ada
+# di Termux) atau path CI. Patch ke loader vendor DI SINI (selalu native),
+# interp-only TANPA --set-rpath (terbukti SIGSEGV). Gagal → jalur loader.
+rm -f "$MARK"
+if [ -x "$LOADER" ] && [ -f "$OC" ]; then
+  if head -c 65536 "$OC" | grep -aqF "$LOADER"; then
+    touch "$MARK"                       # INTERP sudah menunjuk lokasi final
+  elif [ -x "$PATCHER" ]; then
+    say "patch PT_INTERP ke loader vendor (first-run)…"
+    if "$LOADER" --library-path "$VENDOR" "$PATCHER" \
+         --set-interpreter "$LOADER" "$OC" 2>/dev/null \
+       && LD_LIBRARY_PATH="$VENDOR" "$OC" --version >/dev/null 2>&1; then
+      touch "$MARK"
+      say "✅ binary dipatch (interp-only, tanpa RPATH)"
+    else
+      say "⚠️ patch gagal — wrapper pakai jalur loader (perintah sekali-jalan tetap jalan)"
+    fi
+  else
+    say "⚠️ patchelf tidak ditemukan — wrapper pakai jalur loader"
+  fi
+fi
 
 # wrapper CLI (sh murni, tanpa node)
 # rm -f dulu agar ikut menimpa symlink npm lama (bukan menulis ke target-nya)
 rm -f "$BINDIR/opencode-termux"
-{ printf '#!/bin/sh\n'
+{
+  printf '#!/bin/sh\n'
+  printf 'LIBDIR=%s\n' "\"$LIBDIR\""
   printf 'export LD_PRELOAD=\n'
-  printf 'export TMPDIR="${TMPDIR:-%s/tmp}"\n' "$LIBDIR"
+  printf 'export LD_LIBRARY_PATH="$LIBDIR/vendor"\n'
+  printf 'export TMPDIR="${TMPDIR:-$LIBDIR/tmp}"\n'
   printf 'mkdir -p "$TMPDIR"\n'
-  printf 'exec "%s/vendor/opencode" "$@"\n' "$LIBDIR"
+  printf 'if [ -f "$LIBDIR/.interp-patched" ]; then\n'
+  printf '  exec "$LIBDIR/vendor/opencode" "$@"\n'
+  printf 'fi\n'
+  printf 'exec "$LIBDIR/vendor/ld-musl.so" --library-path "$LIBDIR/vendor" "$LIBDIR/vendor/opencode" "$@"\n'
 } > "$BINDIR/opencode-termux"
 chmod +x "$BINDIR/opencode-termux"
 
@@ -82,13 +125,17 @@ if [ "$IS_TERMUX" = 1 ]; then
   [ -f "$PREFIX/etc/hosts" ] || printf '127.0.0.1 localhost\n' > "$PREFIX/etc/hosts" 2>/dev/null || true
 fi
 
-# ---- smoke test ----------------------------------------------------------
+# ---- smoke test (via wrapper — menguji jalur exec yang sebenarnya) -------
 if "$BINDIR/opencode-termux" --version >"$WORK/ocx-ver.$$" 2>&1; then
-  say "✅ terpasang: $($BINDIR/opencode-termux --version)"
-  say "jalankan: opencode-termux"
+  say "✅ terpasang: $("$BINDIR/opencode-termux" --version)"
+  rm -rf "$LIBDIR.old"
 else
   cat "$WORK/ocx-ver.$$" >&2 || true
+  # rollback: kembalikan instalasi lama (bila ada)
+  if [ -e "$LIBDIR.old" ]; then
+    rm -rf "$LIBDIR"
+    mv "$LIBDIR.old" "$LIBDIR"
+    say "instalasi lama dikembalikan (tidak ada yang berubah)"
+  fi
   die "smoke test gagal — pastikan arsitektur didukung lalu coba lagi"
 fi
-
-rm -rf "$WORK"

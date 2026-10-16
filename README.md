@@ -25,11 +25,10 @@
 | **Architecture** | opencode-ai | 🏆 **FULL CREDIT** |
 | **Musl Loader Build** | opencode-termux (custom) | nemoobc |
 | **Termux Adaptation** | opencode-termux | nemoobc |
-| **Agent Ecosystem** | opencode-termux (extended) | nemoobc |
 | **Offline Installer** | opencode-termux | nemoobc |
 | **Automation (CI/CD)** | opencode-termux | nemoobc |
 
-> **opencode-ai** adalah upstream asli — semua inovasi fundamental, arsitektur agent, integrasi LLM, dan core CLI berasal dari **tim opencode-ai (anomalyco)**. Kami hanya menambal agar jalan di Termux (musl libc, Bionic compat, DNS patch) dan menambah ekosistem agent/automation.
+> **opencode-ai** adalah upstream asli — semua inovasi fundamental, arsitektur agent, integrasi LLM, dan core CLI berasal dari **tim opencode-ai (anomalyco)**. Kami hanya menambal agar jalan di Termux (musl libc, interp patch, DNS) dan menambah otomasi (CI sync, installer offline, wrapper).
 
 🔗 **Upstream:** https://github.com/anomalyco/opencode  
 📦 **npm:** https://www.npmjs.com/package/opencode-ai  
@@ -53,11 +52,11 @@ pasang manual di `~/.config/opencode/`.
 
 ## 🔄 **Sync Upstream Otomatis**
 
-Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) baru setiap **bulan** — begitu ada versi baru, paket ini otomatis menyesuaikan:
+Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) baru setiap **minggu** — begitu ada versi baru, paket ini otomatis menyesuaikan:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  sync-upstream.yml (cron 0 0 1 * *)                         │
+│  sync-upstream.yml (cron 0 0 * * 1)                         │
 ├─────────────────────────────────────────────────────────────┤
 │  1. Cek npm registry @opencode/cli (v2)                       │
 │  2. Bump opencodeUpstream + version patch                     │
@@ -67,6 +66,9 @@ Workflow GitHub mengecek [opencode-ai](https://github.com/anomalyco/opencode) ba
 │  6. Kalau NPM_TOKEN ada: npm publish otomatis               │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+Setiap sync juga otomatis menambah entry **RELEASE-HISTORY.md** + menyinkronkan
+deskripsi paket ke pin baru — tidak ada lagi langkah manual yang bisa terlewat.
 
 **Commit memakai identitas nemoobc** — riwayat bersih, traceable.
 
@@ -106,17 +108,20 @@ Installer resmi `opencode-ai` gagal di Termux karena:
 ```
 opencode-termux (Node shim)
    └─ vendor/opencode       ← binary resmi opencode-linux-arm64-musl
-        ⤳ dijalankan via vendor/ld-musl.so --library-path vendor/
-           (invoke loader — binary TIDAK di-patch; patchelf terbukti
-            merusakkan binary 200MB+ → SIGSEGV)
+        ⤳ PT_INTERP → vendor/ld-musl.so (interp-only, TANPA RPATH)
+           libstdc++/libgcc dilayani LD_LIBRARY_PATH=vendor
+           (--set-rpath terbukti SIGSEGV untuk binary 200MB+)
 ```
 
 \* Path `/etc/resolv.conf` & `/etc/hosts` dipatch saat kompilasi menuju `$PREFIX/etc/` sehingga **DNS jalan tanpa root**.
 
-**Kenapa invoke loader (bukan patch ELF)?** `patchelf --set-interpreter`
-menambah segment baru, memindahkan offset, dan MERUSAKKAN binary besar
-(SIGSEGV — terbukti di runner x64). Jadi binary dibiarkan apa adanya dan
-dijalankan lewat loader musl langsung.
+**Kenapa interp-only (bukan invoke loader atau RPATH)?** `patchelf --set-rpath`
+menambah/mengubah segment dinamis dan merusakkan binary besar (SIGSEGV —
+terbukti di runner x64); invoke-via-loader membuat re-exec server gagal
+(`/proc/self/exe` = loader). Solusinya: `--set-interpreter` saja (mengganti
+string path yang sudah ada di ELF — tanpa segment baru), libstdc++/libgcc
+dipenuhi `LD_LIBRARY_PATH` oleh wrapper. Patch saat install bila native; pada
+cross-build (bundle rilis) di-patch saat first-run di perangkat.
 
 **Terus background server-nya?** opencode v2 spawn server background dengan
 **re-exec dirinya sendiri** — via loader, re-exec itu gagal
@@ -186,7 +191,7 @@ sh opencode-termux-installer.sh
 
 ### **Instalasi Per-Artefak**
 
-Semua file diunduh dari **[GitHub Releases](https://github.com/nemoobc/opencode-termux/releases)** (ganti `{v}` dengan versi, contoh `2.0.6.1`).
+Semua file diunduh dari **[GitHub Releases](https://github.com/nemoobc/opencode-termux/releases)** (ganti `{v}` dengan versi, contoh `1.20.20`).
 
 | # | Artefak | Cara Install / Pakai |
 |---|---------|----------------------|
@@ -259,21 +264,26 @@ Tab ganti Build ↔ Plan, Shift+Tab balik. Verifikasi: footer TUI menampilkan
 
 ```bash
 npm test              # Struktur + unit (cepat, tanpa unduhan besar)
+npm run drill         # Drill installer offline (ekstrak bundle palsu + rollback)
 npm run test:e2e      # E2E penuh: install bundle + smoke test + subcommand
 ```
 
 CI GitHub menjalankan:
-- Struktur test di setiap push
-- **E2E ARM64 sungguhan** (native di runner `ubuntu-24.04-arm` via container Alpine — loader musl prebuilt Termux benar-benar dieksekusi)
+- Struktur + unit test di setiap push, plus **drill installer offline** (`npm run drill` — tanpa jaringan)
+- **Suite penuh `--e2e`** di musl Alpine **x64 dan ARM64 sungguhan** (runner `ubuntu-24.04-arm` — loader musl prebuilt Termux benar-benar dieksekusi; termasuk drill install-gagal-tidak-merusak-vendor)
 
 ---
 
 ## 🔒 **Keamanan**
 
-- Tarball binary diverifikasi **sha512** terhadap metadata resmi registry npm
-- Unduhan memakai retry + backoff eksponensial (tahan jaringan gemetar)
-- gitleaks scan di CI untuk deteksi secrets
-- Binary upstream tidak dimodifikasi — hanya dibungkus
+- v2 (opencode.ai): **pin sha256 per versi/arsitektur** (`BIN_PINS` — bila pin
+  tersedia WAJIB cocok, fail-closed) + verifikasi gzip + cek ELF sebelum exec.
+- v1 (npm): tarball diverifikasi **sha512** terhadap metadata resmi registry npm.
+- Instalasi ber-staging: vendor lama baru diganti setelah pengganti lolos
+  smoke test; gagal → rollback — instalasi yang jalan tidak pernah dirusak.
+- Unduhan memakai retry + backoff eksponensial + timeout 10 menit/percobaan.
+- Binary upstream tidak dimodifikasi secara fungsional — hanya string pesan
+  `/update` & `PT_INTERP` (keduanya diuji di CI e2e).
 
 ---
 
@@ -307,6 +317,7 @@ ls -la dist/
 |--------|--------|
 | `npm run postinstall` | Install bundle vendor (auto dijalankan npm) |
 | `npm test` | Struktur + unit test |
+| `npm run drill` | Drill installer offline (bundle palsu + rollback, tanpa jaringan) |
 | `npm run test:e2e` | E2E test penuh |
 | `./scripts/build-release.sh` | Build 6 artefak rilis |
 | `./scripts/generate-release-notes.sh` | Generate release notes adaptive |
@@ -322,14 +333,14 @@ ls -la dist/
 | [npm Versions](https://www.npmjs.com/package/@nemoobc/opencode-termux?activeTab=versions) | History versi npm |
 | [RELEASE-HISTORY.md](RELEASE-HISTORY.md) | Release notes/riwayat perubahan per versi |
 
-**Skema versi:** `paket.opencodeUpstream.patch` — contoh: `2.0.6.1` (paket v2.0, upstream opencode 2.0.6, patch 1)
+**Skema versi:** `1.20.<patch>` — patch naik tiap perubahan paket; pin upstream opencode tercatat di field `opencodeUpstream` package.json (contoh: paket `1.20.20` → upstream `2.0.21`).
 
 ### 🔄 Alur Rilis Otomatis (kendali tunggal: `sync-upstream`)
 
-Satu-satunya mekanisme yang menaikkan versi & menerbitkan rilis adalah workflow **`sync-upstream`** (otomatis tiap bulan + bisa manual via `workflow_dispatch`):
+Satu-satunya mekanisme yang menaikkan versi & menerbitkan rilis adalah workflow **`sync-upstream`** (otomatis tiap minggu + bisa manual via `workflow_dispatch`):
 
-1. Cek versi terbaru **`opencode-ai`** di npm.
-2. Berbeda dari `opencodeUpstream`? → naikkan `opencodeUpstream` + versi paket, commit + tag `vX.Y.Z`.
+1. Cek versi terbaru **`@opencode/cli`** di npm (v2).
+2. Berbeda dari `opencodeUpstream`? → naikkan `opencodeUpstream` + versi paket + entry `RELEASE-HISTORY.md` + sinkron deskripsi paket, lalu commit + tag `vX.Y.Z`.
 3. **Publish ke npm** `@nemoobc/opencode-termux`.
 4. Dispatch workflow **`release`** → build 6 artefak + unggah ke GitHub Releases.
 
@@ -358,7 +369,7 @@ Rilis manual (mis. commit fitur/perbaikan): naikkan versi di `package.json` → 
 
 **MIT License** — bebas pakai, modifikasi, distribusi.
 
-**Binary opencode resmi** dari upstream opencode-ai — paket ini hanya membungkus + menambah agent/automation.
+**Binary opencode resmi** dari upstream opencode-ai — paket ini hanya membungkus + menambal loader/wrapper. Bebas konflik dengan setup agent kamu sendiri.
 
 ---
 

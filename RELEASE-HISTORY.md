@@ -2,6 +2,64 @@
 
 ---
 
+# v1.20.20 (2026-10-16)
+Upstream: opencode v2.0.21
+
+- **Instalasi anti-rusak (staged swap)**: bundle dirakit di `.vendor-new` →
+  smoke → swap atomik ke `vendor/`; vendor lama TIDAK pernah disentuh sebelum
+  pengganti terbukti jalan, gagal → rollback otomatis. Diuji e2e (install ke
+  versi bogus gagal → vendor lama utuh & tetap jalan).
+- **Lock anti-tabrakan**: `.install.lock` (pid + heartbeat, stale 20 mnt) —
+  `npm rebuild` + auto-heal bersamaan tidak lagi balapan di `.build/`.
+- **Pin sha256 opencode.ai**: tabel `BIN_PINS` (2.0.21 & 2.0.30 arm64, hasil
+  unduhan CDN nyata); bila pin ada → WAJIB cocok (fail-closed) + cek ELF
+  (64-bit LE, machine sesuai arsitektur) sebelum eksekusi.
+- **Timeout unduhan** 10 menit per percobaan (retry tetap 3×).
+- **Resolver Alpine dibenerin**: versi dir dari listing induk dipilih max
+  (fallback "latest-stable" yang mati dihapus), release minirootfs dipilih
+  max (bukan match pertama — 3.21.8, bukan 3.21.0).
+- **msgpatch pindah ke `lib/msgpatch.mjs`** (bisa diuji unit): marker mtime
+  kini mencatat mtime BARU pasca-rename — berhenti scan 195 MB tiap run;
+  guard anti-loop; warning saat anchor upstream drift.
+- **installer.sh offline diperbaiki**: wrapper men-set `LD_LIBRARY_PATH` +
+  first-run patch `PT_INTERP` via loader/patchelf (bundle rilis di-cross-build
+  di CI sehingga binary arm64 datang belum ter-patch) + staging/rollback.
+  Bug eksperimental `Error loading shared library libstdc++.so.6` (EXIT 127)
+  pada bundle offline tuntas.
+- **Guard argumen**: `opencode-termux update|upgrade|doctor|version` menolak
+  argumen tambahan — salah ketik tidak lagi diabaikan diam-diam.
+- **CI**: job e2e menjalankan suite penuh `node test/run.mjs --e2e`
+  (x64 + arm64) + `npm run drill` (drill installer offline tanpa jaringan).
+  Detektor baru: deskripsi memuat pin upstream, anchor msgpatch ada di biner
+  segar (anti-drift), install-gagal-tak-merusak-vendor, marker msgpatch.
+- **sync-upstream**: otomasi menambah entry RELEASE-HISTORY + sinkron
+  deskripsi `(upstream opencode X)`; `bersihkan.yml` keep-latest-1 per
+  workflow — run gagal terbaru dipertahankan sebagai bukti diagnosa.
+- **Docs**: README/panduan disinkronkan (jadwal sync mingguan, jadwal cron
+  jujur, klaim keamanan & arsitektur jujur, klaim agent/command bonus palsu
+  dihapus).
+
+# v1.20.19 (2026-10-01)
+Upstream: opencode v2.0.21
+
+- sync: upstream opencode 2.0.21 — pin ke v2 terbaru yang tersedia di
+  opencode.ai saat itu.
+
+# v1.20.18 (2026-09-22)
+Upstream: opencode v2.0.14
+
+- sync: upstream opencode 2.0.14
+
+# v1.20.17 (2026-09-22)
+Upstream: opencode v2.0.13
+
+- sync: upstream opencode 2.0.13
+
+# v1.20.16 (2026-09-21)
+Upstream: opencode v2.0.12
+
+- sync: upstream opencode 2.0.12
+
 # v1.20.15 (2026-09-21)
 Upstream: opencode v2.0.11
 

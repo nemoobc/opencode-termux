@@ -31,9 +31,11 @@ node --version   # harus >= 18
 npm install -g @nemoobc/opencode-termux
 ```
 
-Installer otomatis: mengunduh binary resmi opencode (diverifikasi **sha512**),
-menyiapkan loader musl + libstdc++/libgcc, membetulkan DNS tanpa root, lalu
-menjalankan smoke test. Selesai dalam ± 1 menit di jaringan normal.
+Installer otomatis: mengunduh binary resmi opencode (v2: pin **sha256** +
+gzip + cek ELF; v1: **sha512** registry), menyiapkan loader musl +
+libstdc++/libgcc, membetulkan DNS tanpa root, lalu menjalankan smoke test.
+Bundle dirakit di staging: kalau gagal, instalasi lama dikembalikan utuh
+(rollback). Selesai dalam ± 1 menit di jaringan normal.
 
 > **Muncul warning `install-scripts`?** Izinkan sekali, lalu ulangi:
 > ```bash
@@ -68,7 +70,7 @@ tanpa Node.js, checksum sha256 ikut terverifikasi via `SHA256SUMS.txt`.
 
 Semua file diunduh dari
 **[Releases](https://github.com/nemoobc/opencode-termux/releases)**. Ganti `{v}`
-dengan versi (contoh `2.0.6.1`), dan `-aarch64` dengan `-x86_64` kalau kamu di
+dengan versi (contoh `1.20.20`), dan `-aarch64` dengan `-x86_64` kalau kamu di
 emulator/PC. **Verifikasi dulu sebelum dipakai:** `sha256sum -c SHA256SUMS.txt`.
 
 | # | Artefak | Cara install / pakai |
@@ -94,7 +96,7 @@ sh opencode-termux-installer.sh       # pakai bundle -aarch64 di sampingnya
 ## 4️⃣ Verifikasi
 
 ```bash
-opencode-termux --version   # contoh: 2.0.6
+opencode-termux --version   # contoh: 2.0.21
 opencode-termux doctor      # diagnosis lengkap lingkungan
 ```
 
@@ -116,24 +118,18 @@ opencode-termux
 ```
 
 Config default sudah terpasang otomatis dengan **model
-`opencode-zen/kimi-k2-5`** (provider zen) — tanpa API key. Lokasi config:
+`opencode/big-pickle`** (provider opencode-zen) — tanpa API key. Lokasi config:
 `~/.config/opencode/opencode.json` (milik user; installer tidak pernah menimpa).
 
-Bonus ikut terpasang — agent & command siap pakai:
-
-| Command | Fungsi |
-|---|---|
-| `/test` | seluruh test suite + laporan |
-| `/fix` | loop perbaikan sampai hijau |
-| `/build-apk` | build APK lewat agent apk-builder |
-| `/release` | bump → tag → release |
+Paket ini **tidak** membundel agent/command/skill tambahan — lingkungan bersih,
+bebas konflik dengan setup kamu sendiri.
 
 ## 6️⃣ Update & uninstall
 
 ```bash
-opencode-termux update                        # perbarui binary ke upstream terbaru
+opencode-termux update                        # update paket + binary via npm (pin upstream terbaru)
 npm uninstall -g @nemoobc/opencode-termux     # copot paket
-rm -rf ~/.opencode-termux                     # (opsional) hapus cache bundle lokal
+rm -rf "$PREFIX/lib/opencode-termux"          # (opsional) hapus bundle lokal
 ```
 
 Config dan riwayat di `~/.config/opencode/` tidak disentuh saat uninstall.
@@ -165,9 +161,10 @@ lebih hemat baterai.
 - `~/.config/opencode/` — config & agent/command kamu
 - `<global-npm>/@nemoobc/opencode-termux/vendor/` — binary + loader (± 200 MB)
 
-**Apakah binary-nya resmi?** Ya — diunduh dari npm `opencode-linux-arm64-musl`
-resmi milik upstream opencode, diverifikasi sha512 terhadap registry. Paket ini
-hanya membungkus + menambal loader libc agar ramah Termux.
+**Apakah binary-nya resmi?** Ya — diunduh dari CDN resmi opencode.ai
+(`opencode-linux-*-musl.tar.gz`), diverifikasi pin sha256 (bila tersedia) +
+gzip + cek ELF. Paket ini hanya membungkus + menambal loader libc agar ramah
+Termux.
 
 **Bisa dipakai di emulator/Waydroid/x64?** Bisa — jalankan manual dengan
 `OCX_ARCH=x64 OCX_FORCE=1 node install.mjs`.

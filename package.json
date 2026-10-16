@@ -1,7 +1,7 @@
 {
   "name": "@nemoobc/opencode-termux",
-  "version": "1.20.19",
-  "description": "opencode CLI native untuk Termux/Android tanpa proot \u2014 membundel binary opencode resmi (upstream opencode 2.2.0) + patch ELF biar jalan native",
+  "version": "1.20.20",
+  "description": "opencode CLI native untuk Termux/Android tanpa proot — membundel binary opencode resmi (upstream opencode 2.0.21) + patch ELF biar jalan native",
   "type": "module",
   "bin": {
     "opencode-termux": "./bin/opencode-termux.js"
@@ -9,7 +9,8 @@
   "scripts": {
     "postinstall": "node install.mjs",
     "test": "node test/run.mjs",
-    "test:e2e": "node test/run.mjs --e2e"
+    "test:e2e": "node test/run.mjs --e2e",
+    "drill": "node test/drill.mjs"
   },
   "keywords": [
     "opencode",

@@ -15,7 +15,10 @@ jobs:
       - env: { GH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
           HAPUS=0
-          for id in $(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '.workflow_runs[] | select(.conclusion=="failure") | .id'); do
+          # keep-latest-1: hapus run gagal LAMA; run gagal TERBARU tiap
+          # workflow dipertahankan sebagai bukti diagnosa (log hilang = buta).
+          IDS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" --jq '[.workflow_runs[] | select(.conclusion=="failure")] | sort_by(.created_at) | group_by(.workflow_id) | map(.[:-1]) | flatten | .[].id')
+          for id in $IDS; do
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/runs/$id" >/dev/null 2>&1 && HAPUS=$((HAPUS+1))
           done
-          echo "dihapus: $HAPUS run gagal (yang centang dibiarkan)"
+          echo "dihapus: $HAPUS run gagal (run gagal terbaru tiap workflow dipertahankan)"

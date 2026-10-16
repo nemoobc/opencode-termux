@@ -5,3 +5,14 @@ vendor/
 
 # artefak rilis dibangun otomatis oleh workflow release — jangan di-track
 dist/
+
+# artefak lokal instalasi/test (staging swap, lock, drill)
+.install.lock
+.vendor-new/
+.vendor-old/
+.build-test-*/
+.build-test-home/
+.build-test-prefix/
+.build-drill-*/
+.latih/
+.probe/

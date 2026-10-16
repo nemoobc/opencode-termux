@@ -14,10 +14,10 @@ File `ld-musl-aarch64-termux.so` adalah custom musl loader yang dipatch agar:
 ### Langkah Build
 
 ```bash
-# 1. Clone musl repo (versi yang kompatibel dengan Alpine 3.21)
+# 1. Clone musl repo (versi yang kompatibel dengan Alpine 3.21+)
 git clone https://git.musl-libc.org/git/musl
 cd musl
-git checkout v1.2.5  # atau tag yang dipakai Alpine 3.21
+git checkout v1.2.5  # atau tag yang dipakai Alpine dir CDN terbaru (v3.2x)
 
 # 2. Patch src/internal/dynlink.c untuk ganti path resolv.conf & hosts
 # Cari baris yang define RESOLV_CONF dan HOSTS_PATH, ganti ke:

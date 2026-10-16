@@ -37,10 +37,13 @@ jobs:
             echo "v$NEWVER sudah terpakai (tag/npm) — naikkan"
             NEWVER=$(python3 -c "import sys; a=sys.argv[1].split('.'); a[-1]=str(int(a[-1])+1); print('.'.join(a))" "$NEWVER")
           done
-          python3 - "$NEWVER" <<'PYEOF'
-          import json, sys
+          python3 - "$NEWVER" "$UP" <<'PYEOF'
+          import json, re, sys, datetime
           p = json.load(open('package.json'))
           p['version'] = sys.argv[1]
+          up = sys.argv[2]
+          # deskripsi ikut sinkron: "(upstream opencode X)" → pin baru
+          p['description'] = re.sub(r'\(upstream opencode [^)]*\)', f'(upstream opencode {up})', p.get('description', ''))
           with open('package.json', 'w') as f:
               json.dump(p, f, indent=2)
               f.write('\n')
@@ -54,10 +57,25 @@ jobs:
                   json.dump(l, f, indent=2)
                   f.write('\n')
           except: pass
+          # RELEASE-HISTORY: prepend entry versi baru — otomasi, bukan manual
+          # (detektor test/run.mjs memastikan entry paket terbaru selalu ada)
+          date = datetime.date.today().isoformat()
+          entry = f"# v{sys.argv[1]} ({date})\nUpstream: opencode v{up}\n\n- sync: upstream opencode {up}\n\n---\n\n"
+          try:
+              t = open('RELEASE-HISTORY.md').read()
+              marker = '\n---\n\n'
+              i = t.find(marker)
+              if i >= 0:
+                  t = t[:i + len(marker)] + entry + t[i + len(marker):]
+              else:
+                  t = t.rstrip() + '\n\n' + entry
+              open('RELEASE-HISTORY.md', 'w').write(t)
+          except Exception as e:
+              print('RELEASE-HISTORY dilewati:', e)
           PYEOF
           git config user.name "nemoobc"
           git config user.email "258114617+nemoobc@users.noreply.github.com"
-          git add package.json package-lock.json
+          git add package.json package-lock.json RELEASE-HISTORY.md
           git commit -m "sync: upstream opencode $UP"
           git tag "v$NEWVER"
           git push

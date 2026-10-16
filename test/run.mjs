@@ -11,7 +11,9 @@ import { execFileSync, spawnSync } from "child_process"
 import { fileURLToPath } from "url"
 import { cmpVer, alpinePkg } from "../lib/alpine.mjs"
 import { fetchWithRetry } from "../lib/net.mjs"
-import { expectedFromRegistry, verifySha512 } from "../lib/integrity.mjs"
+import { expectedFromRegistry, verifySha512, verifyElf, sha256File, pinFor, BIN_PINS } from "../lib/integrity.mjs"
+import { MSG_PATCHES, applyMsgPatches } from "../lib/msgpatch.mjs"
+import { acquireLock } from "../lib/lock.mjs"
 
 const E2E = process.env.OCX_E2E === "1" || process.argv.includes("--e2e")
 
@@ -104,10 +106,11 @@ t("workflow test: job e2e x64 memaksa install (OCX_FORCE+OCX_ARCH)", () => {
 })
 t("workflow test: punya job e2e arm64 (validasi loader prebuilt)", () => {
   const y = read(".github/workflows/test.yml")
+  const arm = y.split("e2e-arm64:")[1] || ""
   ok(/e2e-arm64:/.test(y), "job e2e-arm64 hilang")
   ok(/runs-on:\s*ubuntu-24\.04-arm/.test(y), "runner arm64 tidak dipakai")
   ok(/node:20-alpine/.test(y), "environment musl (Alpine) tidak dipakai")
-  ok(/\.\/vendor\/opencode --version/.test(y), "binary arm64 tidak dieksekusi")
+  ok(/node test\/run\.mjs --e2e/.test(arm), "suite penuh (yang mengeksekusi binary arm64) tidak dijalankan")
 })
 t("workflow release: bangun & unggah 6 artefak otomatis", () => {
   const y = read(".github/workflows/release.yml")
@@ -122,6 +125,9 @@ t("sync-upstream: bump versi ikut men-tag (pemicu rilis)", () => {
 t("skrip rilis: sintaks valid & pola penting ada", () => {
   execFileSync("bash", ["-n", path.join(root, "scripts/build-release.sh")])
   execFileSync("sh", ["-n", path.join(root, "scripts/installer.sh")])
+  for (const s of ["scripts/build-all.sh", "scripts/orchestrator", "scripts/generate-release-notes.sh", "scripts/build-install-guide.sh"]) {
+    execFileSync("bash", ["-n", path.join(root, s)])
+  }
   const b = read("scripts/build-release.sh")
   for (const need of ["aarch64", "x86_64", "npm pack", "SHA256SUMS.txt", "-eq 6"]) {
     ok(b.includes(need), `build-release kurang "${need}"`)
@@ -210,6 +216,115 @@ t("expectedFromRegistry: ambil integrity dari packument", () => {
   ok(expectedFromRegistry(pk, "9.9.9") === null, "versi asing harus null")
 })
 
+// ===== 7d. unit msgpatch =====
+t("msgpatch: semua needle diganti dengan padding, panjang file tetap", () => {
+  const input = MSG_PATCHES.map(([n]) => `..${n}..`).join("")
+  const { out, applied, missing } = applyMsgPatches(input)
+  ok(missing.length === 0, `needle hilang di input uji: ${missing.length}`)
+  ok(applied.length === MSG_PATCHES.length, `aplikasi = ${applied.length}, harus ${MSG_PATCHES.length}`)
+  ok(out.length === input.length, "panjang berubah — offset blob bergeser!")
+  for (const [needle, rep] of MSG_PATCHES) {
+    ok(!out.includes(needle), "needle asli masih ada")
+    ok(out.includes(rep + " ".repeat(needle.length - rep.length)), "pengganti+padding tidak dihasilkan")
+  }
+})
+t("msgpatch: tabel anchor konsisten (rep ≤ needle, tautan ke docs/msgpatch)", () => {
+  for (const [n, r] of MSG_PATCHES) ok(r.length <= n.length, `rep > needle: "${r}"`)
+})
+t("msgpatch: needle hilang dilaporkan sebagai missing (deteksi drift upstream)", () => {
+  const { applied, missing } = applyMsgPatches("isi tanpa anchor")
+  ok(applied.length === 0, "tidak boleh ada aplikasi")
+  ok(missing.length === MSG_PATCHES.length, "drift tidak terdeteksi")
+})
+t("msgpatch: rep > needle → skip aman, tidak crash", () => {
+  const { applied } = applyMsgPatches("xxneedlexx", [["needle", "terlalu panjang sekali"]])
+  ok(applied.length === 0, "harusnya dilewati dengan warning")
+})
+t("msgpatch: rep === needle tidak bikin loop tak berhenti", () => {
+  const { applied } = applyMsgPatches("aa teks bb", [["teks", "teks"]])
+  ok(applied.length === 0, "no-op replace harus dilewati")
+})
+
+// ===== 7e. unit lock =====
+t("lock: holder kedua memblokir, release membuka kembali", async () => {
+  const dir = fs.mkdtempSync(path.join(root, ".build-test-lock-"))
+  try {
+    const lp = path.join(dir, "x.lock")
+    const l1 = await acquireLock(lp, { timeoutMs: 500, staleMs: 60000 })
+    let blocked = null
+    try { await acquireLock(lp, { timeoutMs: 200, staleMs: 60000 }) } catch (e) { blocked = e }
+    ok(blocked, "holder kedua harus gagal selama pemegang hidup")
+    l1.release()
+    const l2 = await acquireLock(lp, { timeoutMs: 200, staleMs: 60000 })
+    ok(fs.existsSync(lp), "lock tidak terbentuk")
+    l2.release()
+    ok(!fs.existsSync(lp), "lock tidak terhapus saat release")
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+t("lock: basi (pid mati) diambil alih otomatis", async () => {
+  const dir = fs.mkdtempSync(path.join(root, ".build-test-lock-"))
+  try {
+    const lp = path.join(dir, "x.lock")
+    fs.writeFileSync(lp, JSON.stringify({ pid: 999999999, ts: Date.now() }))
+    const l = await acquireLock(lp, { timeoutMs: 500, staleMs: 60000 })
+    l.release()
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
+// ===== 7f. unit ELF & pin =====
+t("verifyElf: terima arm64 valid, tolak non-ELF & machine salah", () => {
+  const dir = fs.mkdtempSync(path.join(root, ".build-test-elf-"))
+  try {
+    const good = Buffer.alloc(64)
+    good.write("\x7fELF", 0, "latin1"); good[4] = 2; good[5] = 1; good.writeUInt16LE(0xb7, 0x12)
+    const f1 = path.join(dir, "good"); fs.writeFileSync(f1, good)
+    ok(verifyElf(f1, "arm64"), "arm64 valid harus lulus")
+    let t1 = null; try { verifyElf(f1, "x64") } catch (e) { t1 = e }
+    ok(t1, "arm64 diverifikasi sebagai x64 harus ditolak")
+    const f2 = path.join(dir, "txt"); fs.writeFileSync(f2, "bukan elf")
+    let t2 = null; try { verifyElf(f2, "arm64") } catch (e) { t2 = e }
+    ok(t2, "non-ELF harus ditolak")
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+t("pin: BIN_PINS berbentuk sha256 hex + pinFor konsisten", () => {
+  for (const [k, v] of Object.entries(BIN_PINS)) {
+    ok(/^\d+\.\d+\.\d+\/(arm64|x64)$/.test(k), `key aneh: ${k}`)
+    ok(/^[0-9a-f]{64}$/.test(v), `hash tidak hex64 utk ${k}`)
+  }
+  ok(pinFor("2.0.21", "arm64") === BIN_PINS["2.0.21/arm64"], "pinFor salah")
+  ok(pinFor("9.9.9", "arm64") === null, "versi tanpa pin harus null")
+})
+t("deskripsi paket: memuat '(upstream opencode <pin>)' (deteksi drift ganda)", () => {
+  const p = json("package.json")
+  ok(p.description.includes(`(upstream opencode ${p.opencodeUpstream})`),
+    `deskripsi tidak memuat pin upstream — sekarang: "${p.description.slice(0, 80)}…"`)
+})
+t("package.json: script drill terdaftar", () => {
+  ok(typeof json("package.json").scripts.drill === "string", "script drill hilang")
+})
+t("installer.sh: LD_LIBRARY_PATH + first-run patch + marker + tanpa RPATH", () => {
+  const code = read("scripts/installer.sh").split("\n").filter(l => !l.trim().startsWith("#")).join("\n")
+  ok(/LD_LIBRARY_PATH/.test(code), "LD_LIBRARY_PATH hilang — libstdc++ tak ketemu (EXIT 127)")
+  ok(/--set-interpreter/.test(code), "first-run patch PT_INTERP hilang")
+  ok(/\.interp-patched/.test(code), "marker .interp-patched hilang")
+  ok(!/--set-rpath/.test(code), "RPATH kembali — SIGSEGV")
+})
+t("workflow bersihkan: simpan run gagal TERBARU per workflow (keep-latest)", () => {
+  const y = read(".github/workflows/bersihkan.yml")
+  ok(/group_by\(\.workflow_id\)/.test(y), "logika keep-latest-1 per workflow hilang")
+})
+t("workflow sync: append RELEASE-HISTORY + sinkron deskripsi otomatis", () => {
+  const y = read(".github/workflows/sync-upstream.yml")
+  ok(/RELEASE-HISTORY\.md/.test(y), "RELEASE-HISTORY tidak di-append otomatis oleh sync")
+  ok(/upstream opencode/.test(y), "deskripsi tidak disinkronkan ke pin baru")
+})
+t("workflow test: e2e menjalankan suite penuh (--e2e) termasuk arm64", () => {
+  const y = read(".github/workflows/test.yml")
+  const n = (y.match(/node test\/run\.mjs --e2e/g) || []).length
+  ok(n >= 2, `hanya ${n} job menjalankan suite --e2e (butuh 2)`)
+  ok(/OCX_ARCH=arm64/.test(y), "e2e-arm64 tanpa OCX_ARCH=arm64 — suite akan memilih x64")
+})
+
 // ===== 8. git hygiene =====
 t("git: tidak ada tarball/artefak build yang ter-track", () => {
   const ls = execFileSync("git", ["ls-files"], { cwd: root }).toString().split("\n").filter(Boolean)
@@ -220,9 +335,9 @@ t("git: tidak ada tarball/artefak build yang ter-track", () => {
     ok(f !== ".build" && !f.startsWith(".build/"), ".build masih di-track")
   }
 })
-t("gitignore: mencakup vendor/, .build/, node_modules/, *.tgz, dist/", () => {
+t("gitignore: mencakup vendor/, .build/, node_modules/, *.tgz, dist/, artefak staging", () => {
   const g = read(".gitignore")
-  for (const need of ["vendor/", ".build/", "node_modules/", "*.tgz", "dist/"]) ok(g.includes(need), `.gitignore kurang ${need}`)
+  for (const need of ["vendor/", ".build/", "node_modules/", "*.tgz", "dist/", ".install.lock", ".vendor-new", ".vendor-old"]) ok(g.includes(need), `.gitignore kurang ${need}`)
 })
 
 // ===== 8b. identitas: semua rata jadi opencode-termux =====
@@ -268,11 +383,19 @@ if (E2E) {
   const E2E_ARCH = process.env.OCX_ARCH || "x64"
   console.log(`\n🔧 mode E2E: instalasi bundle ${E2E_ARCH} + smoke test + subcommand…`)
   t(`e2e: install.mjs selesai tanpa error (OCX_ARCH=${E2E_ARCH} OCX_FORCE=1)`, () => {
+    fs.mkdirSync(path.join(root, ".build-test-home"), { recursive: true })
     execFileSync(process.execPath, [path.join(root, "install.mjs")], {
       stdio: "inherit",
-      env: { ...process.env, OCX_ARCH: E2E_ARCH, OCX_FORCE: "1" },
+      env: { ...process.env, OCX_ARCH: E2E_ARCH, OCX_FORCE: "1", HOME: path.join(root, ".build-test-home") },
       cwd: root,
     })
+  })
+  t("e2e: biner segar memuat semua anchor msgpatch (anti-drift upstream)", () => {
+    // DIJALANKAN sebelum wrapper menyentuh binary — anchor harus ada di
+    // tarball segar; hilang = tabel MSG_PATCHES harus diperbarui (versi baru).
+    const s = fs.readFileSync(path.join(root, "vendor/opencode")).toString("latin1")
+    const missing = MSG_PATCHES.filter(([n]) => !s.includes(n)).map(([n]) => n.slice(0, 32))
+    ok(missing.length === 0, `anchor hilang: ${missing.join(" | ")} — perbarui MSG_PATCHES di lib/msgpatch.mjs`)
   })
   t("e2e: vendor/opencode --version merespons", () => {
     const out = execFileSync(process.execPath, [path.join(root, "bin/opencode-termux.js"), "--version"], {
@@ -280,6 +403,18 @@ if (E2E) {
     })
     ok(/\d+\.\d+\.\d+/.test(out), `output tak dikenal: ${out.trim()}`)
     console.log(`   └─ version: ${out.trim()}`)
+  })
+  t("e2e: marker msgpatch mencatat mtime BARU (tidak rescan 195MB tiap run)", () => {
+    // jalur patch sudah dieksekusi oleh test '--version' di atas
+    const st = fs.statSync(path.join(root, "vendor/opencode"))
+    const marker = fs.readFileSync(path.join(root, "vendor/.msg-patched"), "utf8").trim()
+    ok(marker === String(st.mtimeMs), `marker (${marker}) ≠ mtime binary (${st.mtimeMs}) — akan rescan tiap run`)
+  })
+  t("e2e: libstdc++.so.6 = symlink ke file real ber-versi (anti-hardcode Alpine)", () => {
+    const lib = path.join(root, "vendor", "libstdc++.so.6")
+    ok(fs.lstatSync(lib).isSymbolicLink(), "libstdc++.so.6 bukan symlink (nama versi di-hardcode lagi?)")
+    const target = path.join(root, "vendor", fs.readlinkSync(lib))
+    ok(fs.existsSync(target), `target symlink tidak ada: ${target}`)
   })
   t("e2e: subcommand version mencetak versi paket & binary", () => {
     const out = execFileSync(process.execPath, [path.join(root, "bin/opencode-termux.js"), "version"], {
@@ -296,6 +431,21 @@ if (E2E) {
     })
     console.log(r.stdout.split("\n").map(l => `   ${l}`).join("\n"))
     ok(r.status === 0, `doctor exit ${r.status}\n${r.stdout}`)
+  })
+  t("e2e: install gagal (versi bogus) → vendor lama TETAP UTUH (staged swap)", () => {
+    const before = sha256File(path.join(root, "vendor/opencode"))
+    const r = spawnSync(process.execPath, [path.join(root, "install.mjs")], {
+      encoding: "utf8", cwd: root, timeout: 180000,
+      env: { ...process.env, OCX_ARCH: E2E_ARCH, OCX_FORCE: "1", OCX_UPSTREAM: "9.9.9", HOME: path.join(root, ".build-test-home") },
+    })
+    ok(r.status !== 0, "install versi bogus harus GAGAL (404)")
+    ok(!fs.existsSync(path.join(root, ".vendor-new")), "staging .vendor-new tidak dibersihkan")
+    const after = sha256File(path.join(root, "vendor/opencode"))
+    ok(before === after, "vendor lama BERUBAH padahal install gagal — swap tidak aman!")
+    const v = execFileSync(process.execPath, [path.join(root, "bin/opencode-termux.js"), "--version"], {
+      encoding: "utf8", cwd: root,
+    })
+    ok(/\d+\.\d+\.\d+/.test(v), "binary lama tidak jalan lagi setelah install gagal")
   })
 }
 
