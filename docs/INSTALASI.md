@@ -124,6 +124,24 @@ Config default sudah terpasang otomatis dengan **model
 Paket ini **tidak** membundel agent/command/skill tambahan — lingkungan bersih,
 bebas konflik dengan setup kamu sendiri.
 
+### Web UI & pairing (login)
+
+`opencode-termux serve` menyalakan API + web UI; service background memakai
+port sendiri (cek `opencode-termux service status`). Browser akan meminta
+**Server address + Password**:
+
+```bash
+opencode-termux pair     # cetak link sekali-pakai (aktif 5 menit) — buka di browser, langsung login
+```
+
+Password service juga tersimpan di `~/.local/state/opencode/service.json`
+(field `password`). Dari perangkat lain (HP/PC di WiFi sama):
+`opencode-termux service set hostname 0.0.0.0`, lalu pakai URL
+`http://<ip-hp>:<port>`.
+
+Catatan: service background yang di-idupkan TUI ikut dimatikan saat TUI
+ditutup — biar web UI tetap hidup, jalankan `opencode-termux service start`.
+
 ## 6️⃣ Update & uninstall
 
 ```bash
@@ -143,6 +161,7 @@ Config dan riwayat di `~/.config/opencode/` tidak disentuh saat uninstall.
 | `tar: not found` saat install | utilitas tar belum ada | `pkg install tar` lalu `opencode-termux update` |
 | `EACCES` / permission denied | salah kaprah pakai sudo | Termux tak punya root — jangan `sudo`; error lain? `npm rebuild -g @nemoobc/opencode-termux` |
 | Timeout DNS / host not found | resolv.conf belum terbentuk | jalankan sekali: `opencode-termux` (dibuat otomatis), cek `$PREFIX/etc/resolv.conf` |
+| Web UI minta password / link pair "expired or already used" | password service tak tampil; link pair sekali-pakai & aktif 5 menit | jalankan `opencode-termux pair` (ulang jika kedaluwarsa); password ada di `~/.local/state/opencode/service.json` |
 | `Exec format error` | CPU bukan arm64/x64 | cek `uname -m`; arm32 tidak didukung |
 | Bundle gagal unduh berkali-kali | jaringan operator bermasalah | coba WiFi / ganti DNS hotspot; installer retry 3x otomatis |
 | `integritas gagal` saat install | unduhan korup | jalankan lagi `opencode-termux update` — hash diverifikasi ulang |

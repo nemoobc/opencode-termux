@@ -91,9 +91,25 @@ opencode-termux update
 > `@nemoobc/opencode-termux`. Wrapper mem-patch pesan error bawaan itu di
 > binary vendor: saat kamu buka `/update`, kamu melihat
 > **`Update via npm: npm install -g @nemoobc/opencode-termux`** sebagai
-> penunjuk. Patch ini idempoten (rekam mtime di `vendor/.msg-patched`) dan
-> otomatis diulang tiap binary vendor berganti (update npm / sync upstream).
+> penunjuk. Patch ini idempoten (rekam mtime + sidik tabel patch di
+> `vendor/.msg-patched`) dan otomatis diulang tiap binary vendor berganti
+> atau tabel patch diperbarui (update npm / sync upstream).
 > Eksekusinya tetap dari terminal: `opencode-termux update`.
+
+> ℹ️ **Export sesi ke editor** (keybind `<leader>x`, atau slash `/editor`)
+> menulis file sementara lewat `os.tmpdir()` — di Termux artinya `$PREFIX/tmp`,
+> susah dijangkau dari home. Wrapper `opencode-termux` mengarahkan `TMPDIR`
+> proses opencode ke **`$HOME/.cache/opencode/tmp`** — file mendarat di dalam
+> home (gampang dibuka editor/aplikasi Android). File tetap sementara:
+> dihapus otomatis saat editor ditutup — simpan (save-as) ke lokasi lain
+> bila ingin disimpan permanen. Cek lokasi aktif: `opencode-termux doctor`.
+
+> ℹ️ **Login web UI (`serve`)** — halaman browser meminta *Server address* +
+> *Password*. Cara termudah: **`opencode-termux pair`** → buka link
+> sekali-pakai (aktif 5 menit) di browser. Password service juga tersimpan di
+> `~/.local/state/opencode/service.json`. Dari perangkat lain:
+> `opencode-termux service set hostname 0.0.0.0`, lalu pakai
+> `http://<ip-hp>:<port>` (port dari `opencode-termux service status`).
 
 ---
 

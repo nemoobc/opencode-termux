@@ -12,7 +12,7 @@ import { fileURLToPath } from "url"
 import { cmpVer, alpinePkg } from "../lib/alpine.mjs"
 import { fetchWithRetry } from "../lib/net.mjs"
 import { expectedFromRegistry, verifySha512, verifyElf, sha256File, pinFor, BIN_PINS } from "../lib/integrity.mjs"
-import { MSG_PATCHES, applyMsgPatches } from "../lib/msgpatch.mjs"
+import { MSG_PATCHES, applyMsgPatches, patchBinaryMessages } from "../lib/msgpatch.mjs"
 import { acquireLock } from "../lib/lock.mjs"
 
 const E2E = process.env.OCX_E2E === "1" || process.argv.includes("--e2e")
@@ -244,6 +244,40 @@ t("msgpatch: rep === needle tidak bikin loop tak berhenti", () => {
   const { applied } = applyMsgPatches("aa teks bb", [["teks", "teks"]])
   ok(applied.length === 0, "no-op replace harus dilewati")
 })
+t("wrapper: TMPDIR proses opencode diarahkan ke $HOME/.cache/opencode/tmp (export editor di home)", () => {
+  const src = fs.readFileSync(path.join(root, "bin", "opencode-termux.js"), "utf8")
+  ok(src.includes(`".cache", "opencode", "tmp"`), "ensureTmp tidak mengarah ke .cache/opencode/tmp")
+  ok(/function ensureTmp\(\)[\s\S]{0,600}?process\.env\.TMPDIR = t/.test(src), "TMPDIR tidak diset di ensureTmp")
+  ok(!src.includes("EXPORT_PATCHES"), "sisa referensi EXPORT_PATCHES di wrapper (dead patch)")
+  ok(!fs.readFileSync(path.join(root, "lib", "msgpatch.mjs"), "utf8").includes("EXPORT_PATCHES"), "tabel EXPORT_PATCHES masih ada di lib (dead patch)")
+})
+t("msgpatch: anchor hilang tapi rep ada → sudah dipatch, bukan drift", () => {
+  const input = MSG_PATCHES.map(([, r]) => `..${r}..`).join("")
+  const { out, applied, missing } = applyMsgPatches(input, MSG_PATCHES)
+  ok(missing.length === 0, `drift palsu: ${missing.length}`)
+  ok(applied.length === 0, "tidak ada yang perlu diganti")
+  ok(out === input, "isi berubah tanpa perlu")
+})
+t("msgpatch: marker mtime:sidik — skip idempoten, rescan aman dari format lama", () => {
+  const dir = fs.mkdtempSync(path.join(root, ".build-test-msgpatch-"))
+  try {
+    const bin = path.join(dir, "fakebin")
+    const marker = path.join(dir, "marker")
+    fs.writeFileSync(bin, MSG_PATCHES.map(([n]) => `..${n}..`).join(""))
+    const r1 = patchBinaryMessages({ bin, marker })
+    ok(r1.patched, "run pertama harus menulis patch")
+    ok(fs.readFileSync(marker, "utf8").includes(":"), "marker harus format mtime:sidik")
+    const r2 = patchBinaryMessages({ bin, marker })
+    ok(!r2.patched, "mtime+sidik sama harus skip tanpa scan")
+    fs.writeFileSync(marker, String(fs.statSync(bin).mtimeMs)) // format lama
+    const r3 = patchBinaryMessages({ bin, marker })
+    ok(!r3.patched, "rescan idempoten tidak menulis ulang")
+    ok(r3.missing.length === 0, `format marker lama dianggap drift: ${r3.missing.length}`)
+    const s = fs.readFileSync(bin).toString("latin1")
+    for (const [n] of MSG_PATCHES) ok(!s.includes(n), `needle masih tersisa: ${n.slice(0, 24)}`)
+    ok(s.includes(MSG_PATCHES[0][1]), "rep msg tidak ada")
+  } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
 
 // ===== 7e. unit lock =====
 t("lock: holder kedua memblokir, release membuka kembali", async () => {
@@ -392,10 +426,10 @@ if (E2E) {
   })
   t("e2e: biner segar memuat semua anchor msgpatch (anti-drift upstream)", () => {
     // DIJALANKAN sebelum wrapper menyentuh binary — anchor harus ada di
-    // tarball segar; hilang = tabel MSG_PATCHES harus diperbarui (versi baru).
+    // tarball segar; hilang = tabel patch harus diperbarui (versi baru).
     const s = fs.readFileSync(path.join(root, "vendor/opencode")).toString("latin1")
     const missing = MSG_PATCHES.filter(([n]) => !s.includes(n)).map(([n]) => n.slice(0, 32))
-    ok(missing.length === 0, `anchor hilang: ${missing.join(" | ")} — perbarui MSG_PATCHES di lib/msgpatch.mjs`)
+    ok(missing.length === 0, `anchor hilang: ${missing.join(" | ")} — perbarui tabel patch di lib/msgpatch.mjs`)
   })
   t("e2e: vendor/opencode --version merespons", () => {
     const out = execFileSync(process.execPath, [path.join(root, "bin/opencode-termux.js"), "--version"], {
@@ -408,7 +442,7 @@ if (E2E) {
     // jalur patch sudah dieksekusi oleh test '--version' di atas
     const st = fs.statSync(path.join(root, "vendor/opencode"))
     const marker = fs.readFileSync(path.join(root, "vendor/.msg-patched"), "utf8").trim()
-    ok(marker === String(st.mtimeMs), `marker (${marker}) ≠ mtime binary (${st.mtimeMs}) — akan rescan tiap run`)
+    ok(marker.startsWith(String(st.mtimeMs) + ":"), `marker (${marker}) ≠ mtime binari (${st.mtimeMs}):… — akan rescan tiap run`)
   })
   t("e2e: libstdc++.so.6 = symlink ke file real ber-versi (anti-hardcode Alpine)", () => {
     const lib = path.join(root, "vendor", "libstdc++.so.6")

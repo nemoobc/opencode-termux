@@ -1,6 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/env node
 import { spawnSync } from "child_process"
 import fs from "fs"
+import os from "os"
 import path from "path"
 import { fileURLToPath } from "url"
 import { patchBinaryMessages } from "../lib/msgpatch.mjs"
@@ -53,12 +54,21 @@ function cleanEnv() {
   return rest
 }
 
-// TMPDIR: /tmp di Termux read-only — pastikan ada lokasi writable.
+// TMPDIR: /tmp di Termux read-only. Juga: <leader>x / /editor (export sesi ke
+// editor) menulis file sementara lewat os.tmpdir() — di Termux = $PREFIX/tmp,
+// susah dijangkau user. Wrapper mengarahkan TMPDIR proses opencode ke
+// $HOME/.cache/opencode/tmp supaya file mendarat di dalam home. (Bukan via
+// patch teks biner: modul export = @bytecode — patch teks inert di runtime;
+// lihat catatan di lib/msgpatch.mjs.)
 function ensureTmp() {
-  if (process.env.TMPDIR && fs.existsSync(process.env.TMPDIR)) return
-  const t = path.join(PREFIX, "tmp")
-  fs.mkdirSync(t, { recursive: true })
-  process.env.TMPDIR = t
+  let home = process.env.HOME || ""
+  if (!home) { try { home = os.homedir() } catch {} }
+  const t = home ? path.join(home, ".cache", "opencode", "tmp") : path.join(PREFIX, "tmp")
+  try { fs.mkdirSync(t, { recursive: true }) } catch {}
+  if (fs.existsSync(t)) { process.env.TMPDIR = t; return }
+  const f = path.join(PREFIX, "tmp")
+  fs.mkdirSync(f, { recursive: true })
+  process.env.TMPDIR = f
 }
 
 function ocEnv(extra = {}) {
@@ -112,9 +122,11 @@ function ensurePatched() {
 // Logika /update bawaan ter-compile di binary (deteksi metode + target dari
 // API opencode.ai) — tidak bisa diarahkan ke npm @nemoobc/opencode-termux.
 // Yang bisa diubah: teks errornya (tabel MSG_PATCHES di lib/msgpatch.mjs,
-// re-export agar test mengunci anchor). Idempoten; hanya jalan saat
-// vendor/opencode BARU (mtime berubah) — marker mtime menghindari scan 195MB
-// setiap run; marker mencatat mtime BARU pasca-rename.
+// re-export agar test mengunci anchor); lokasi file export-ke-editor diatur
+// lewat ensureTmp() (TMPDIR → $HOME/.cache/opencode/tmp). Idempoten; hanya
+// jalan saat vendor/opencode BARU atau tabel patch berubah (sidik di marker)
+// — marker menghindari scan 195MB setiap run; marker mencatat mtime+sidik
+// BARU pasca-rename.
 const MSG_MARKER = path.join(vendor, ".msg-patched");
 
 function patchUpdateMsg() {
@@ -214,6 +226,11 @@ function cmdDoctor() {
     if (!fs.existsSync(rc)) throw new Error(`${rc} hilang`)
     return "ada"
   }, { crit: false })
+  cek("TMPDIR (export sesi ke editor)", () => {
+    ensureTmp()
+    if (!fs.existsSync(process.env.TMPDIR || "")) throw new Error(String(process.env.TMPDIR))
+    return process.env.TMPDIR
+  }, { crit: false })
   cek("jaringan registry npm", () => {
     const r = spawnSync(process.execPath, ["-e", "fetch('https://registry.npmjs.org/-/ping').then(r=>{if(!r.ok)process.exit(1)})"], {
       timeout: 10000,
@@ -253,6 +270,10 @@ function cmdVersion() {
 const KNOWN_ARGS = new Set([
   "mini", "run", "serve", "auth", "agents", "agent", "models", "debug",
   "uninstall", "reset", "telemetry", "open", "restore", "menu",
+  // "pair" = jalur login web UI (link sekali-pakai) yang dirujuk halaman
+  // login serve; sisanya subcommand asli binary — jangan dihapus tanpa cek
+  // `vendor/opencode --help`.
+  "pair", "session", "service", "stats", "plugin", "mcp", "api", "acp", "reload",
 ])
 
 function looksLikePath(a) {
@@ -293,7 +314,8 @@ pakai:
   opencode-termux [opsi/path]      jalankan CLI opencode (argumen diteruskan)
   opencode-termux update|upgrade   update via npm: npm install -g @nemoobc/opencode-termux
   opencode-termux doctor           diagnosis lingkungan & bundle
-  opencode-termux version          info versi paket + binary`)
+  opencode-termux version          info versi paket + binary
+  opencode-termux pair             link sekali-pakai untuk login web UI (serve)`)
     process.exit(0)
   }
   if (arg !== undefined && !looksLikeFlag(arg) && !looksLikePath(arg) && !KNOWN_ARGS.has(arg)) {
