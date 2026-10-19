@@ -2,6 +2,13 @@
 
 ---
 
+# v1.20.20 (2026-10-19)
+Upstream: opencode v2.0.32
+
+- sync: upstream opencode 2.0.32
+
+---
+
 # v1.20.20 (2026-10-16)
 Upstream: opencode v2.0.21
 
