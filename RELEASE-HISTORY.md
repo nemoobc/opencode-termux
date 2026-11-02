@@ -2,6 +2,13 @@
 
 ---
 
+# v1.20.22 (2026-11-02)
+Upstream: opencode v2.2.5
+
+- sync: upstream opencode 2.2.5
+
+---
+
 # v1.20.21 (2026-10-26)
 Upstream: opencode v2.1.4
 
